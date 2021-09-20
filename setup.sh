@@ -1408,11 +1408,12 @@ get_apk_package_name_by_command_name() {
     realpath) echo 'coreutils';;
       protoc) echo 'protobuf' ;;
       ps2pdf) echo "ghostscript" ;;
-      rst2man|rst2html)
+     python3) echo 'python3 python3-dev' ;;
+    pip3|pip) echo 'py3-pip' ;;
+    rst2man|rst2html)
               echo "py3-docutils" ;;
     sphinx-build)
               echo "sphinx"  ;;
-    pip3|pip) echo 'py3-pip' ;;
     glibtool|libtoolize|glibtoolize)
                 echo "libtool"  ;;
     autoreconf) echo "autoconf" ;;
