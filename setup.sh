@@ -2373,9 +2373,9 @@ EOF
     regist_dependency required command curl
     regist_dependency required command bash:zsh
     regist_dependency required command python3:python3.9:python3.8:python3.7:python3.6:python ge 3.6.0
-    regist_dependency required command cc:clang
-    regist_dependency required command c++:clang++
-    regist_dependency required command cmake
+    regist_dependency required command clang
+    regist_dependency required command clang++
+    regist_dependency required command cmake ge 3.14
     regist_dependency required command ninja:make:gmake
     regist_dependency required command go
 
