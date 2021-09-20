@@ -1382,9 +1382,10 @@ get_xbps_package_name_by_command_name() {
     realpath) echo 'coreutils';;
       protoc) echo 'protobuf' ;;
       ps2pdf) echo "ghostscript" ;;
-      rst2man|rst2html)
-              echo "python3-docutils" ;;
+     python3) echo 'python3 python3-dev' ;;
     pip|pip3) echo "python3-pip" ;;
+    rst2man|rst2html)
+              echo "python3-docutils" ;;
     glibtool|libtoolize|glibtoolize)
                 echo "libtool"  ;;
     autoreconf) echo "autoconf" ;;
@@ -2378,6 +2379,8 @@ EOF
     regist_dependency required command cmake ge 3.14
     regist_dependency required command ninja:make:gmake
     regist_dependency required command go
+    regist_dependency required command tar
+    regist_dependency required command gzip
 
     step "handle required tools"
     __handle_required_dependencies
