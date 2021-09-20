@@ -1,0 +1,26 @@
+name: FreeBSD
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: macos-10.15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [11, 12]
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: leleliu008/github-actions-vagrant@v1
+      with:
+        mem: 2048
+        box: generic/freebsd${{ matrix.version }}
+        run: |
+          run ./setup.sh

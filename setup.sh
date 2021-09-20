@@ -304,13 +304,13 @@ die_if_sha256sum_mismatch() {
 
 # $1 map_name
 __map_name_ref() {
-    echo "map$(echo "$1" | md5sum)"
+    printf "map_%s\n" "$(printf '%s' "$1" | md5sum)"
 }
 
 # $1 map_name
 # $2 key
 __map_key_ref() {
-    echo "$(__map_name_ref "$1")_key$(echo "$2" | md5sum)"
+    printf "%s_key_%s\n" "$(__map_name_ref "$1")" "$(printf '%s' "$2" | md5sum)"
 }
 
 # $1 map_name
@@ -767,12 +767,110 @@ __get_os_arch_from_arch() {
     fi
 }
 
+__get_os_type_from_uname() {
+    case $1 in
+        msys*)    echo "windows" ;;
+        mingw32*) echo "windows" ;;
+        mingw64*) echo "windows" ;;
+        cygwin*)  echo 'windows' ;;
+        *)        echo "$1" 
+    esac
+}
+
+__get_os_name_from_os_type() {
+    case $1 in
+        freebsd) echo 'FreeBSD' ;;
+        openbsd) echo 'OpenBSD' ;;
+        netbsd)  echo 'NetBSD'  ;;
+        darwin)  sw_vers -productName ;;
+        linux)
+            if [ "$(uname -o 2>/dev/null)" = Android ] ; then
+                echo Android
+            else
+                __get_os_name_from_uname_a ||
+                __get_os_name_from_etc_os_release ||
+                __get_os_name_from_lsb_release
+            fi
+            ;;
+        windows)
+            systeminfo | grep 'OS Name:' | cut -d: -f2 | head -n 1 | sed 's/^[[:space:]]*//'
+            ;;
+        *) echo "$1" 
+    esac
+}
+
+__get_os_version_from_os_type() {
+    case $1 in
+        freebsd) freebsd-version ;;
+        openbsd) uname -r ;;
+        netbsd)  uname -r ;;
+        darwin)  sw_vers -productVersion ;;
+        linux)
+            __get_os_version_from_uname_a ||
+            __get_os_version_from_etc_os_release ||
+            __get_os_version_from_lsb_release ||
+            __get_os_version_from_getprop
+            ;;
+        windows)
+            systeminfo | grep 'OS Version:' | cut -d: -f2 | head -n 1 | sed 's/^[[:space:]]*//' | cut -d ' ' -f1
+            ;;
+    esac
+}
+
+__get_os_sub_system() {
+    case $(uname | tr A-Z a-z) in
+        msys*)    echo "msys"    ;;
+        mingw32*) echo "mingw32" ;;
+        mingw64*) echo "mingw64" ;;
+        cygwin*)  echo 'cygwin'  ;;
+        *)
+            if [ "$(uname -o 2>/dev/null)" = Android ] ; then
+                if [ -n "$TERMUX_VERSION" ] ; then
+                    echo termux
+                fi
+            fi
+    esac
+}
+
+__get_os_arch() {
+    __get_os_arch_from_uname ||
+    __get_os_arch_from_arch
+}
+
+__get_os_libc_from_os_type() {
+    case $1 in
+        linux)
+            if [ "$(uname -o 2>/dev/null)" = Android ] ; then
+                echo bionic
+                return 0
+            fi
+            # https://pubs.opengroup.org/onlinepubs/7908799/xcu/getconf.html
+            if command -v getconf > /dev/null ; then
+                if getconf GNU_LIBC_VERSION > /dev/null 2>&1 ; then
+                    echo glibc
+                    return 0
+                fi
+            fi
+            if command -v ldd > /dev/null ; then
+                if ldd --version 2>&1 | head -n 1 | grep -q GLIBC ; then
+                    echo glibc
+                    return 0
+                fi
+                if ldd --version 2>&1 | head -n 1 | grep -q musl ; then
+                    echo musl
+                    return 0
+                fi
+            fi
+            return 1
+    esac
+}
+
 os() {
     if [ $# -eq 0 ] ; then
-        printf "current-machine-os-kind : %s\n" "$(os kind)"
         printf "current-machine-os-type : %s\n" "$(os type)"
         printf "current-machine-os-name : %s\n" "$(os name)"
         printf "current-machine-os-vers : %s\n" "$(os vers)"
+        printf "current-machine-os-subs : %s\n" "$(os subs)"
         printf "current-machine-os-arch : %s\n" "$(os arch)"
         printf "current-machine-os-libc : %s\n" "$(os libc)"
     elif [ $# -eq 1 ] ; then
@@ -781,111 +879,39 @@ os() {
                 cat <<'EOF'
 os -h | --help
 os -V | --version
-os kind
 os type
-os arch
-os libc
 os name
 os vers
+os subs
+os arch
+os libc
 EOF
                 ;;
-            -V|--version) echo '2021.03.28.23' ;;
-            kind)
-                case $(uname | tr A-Z a-z) in
-                    msys*)    echo "windows" ;;
-                    mingw32*) echo "windows" ;;
-                    mingw64*) echo "windows" ;;
-                    cygwin*)  echo 'windows' ;;
-                    *)
-                        if [ "$(uname -o)" = Android ]; then
-                            echo android
-                        else
-                            uname | tr A-Z a-z
-                        fi
-                esac
+            -V|--version)
+                printf "%s\n" '2021.09.19.22'
                 ;;
-
             type)
-                case $(uname | tr A-Z a-z) in
-                    msys*)    echo "msys"    ;;
-                    mingw32*) echo "mingw32" ;;
-                    mingw64*) echo "mingw64" ;;
-                    cygwin*)  echo 'cygwin'  ;;
-                    *)
-                        if [ "$(uname -o)" = Android ]; then
-                            echo android
-                        else
-                            uname | tr A-Z a-z
-                        fi
-                esac
+                __get_os_type_from_uname $(uname | tr A-Z a-z)
                 ;;
             name)
-                case $(os kind) in
-                    freebsd) echo 'FreeBSD' ;;
-                    openbsd) echo 'OpenBSD' ;;
-                    netbsd)  echo 'NetBSD'  ;;
-                    darwin)  sw_vers -productName ;;
-                    linux)
-                        __get_os_name_from_uname_a ||
-                        __get_os_name_from_etc_os_release ||
-                        __get_os_name_from_lsb_release
-                        ;;
-                    android) echo android ;;
-                    windows)
-                        systeminfo | grep 'OS Name:' | cut -d: -f2 | head -n 1 | sed 's/^[[:space:]]*//' ;;
-                    *)  uname | tr A-Z a-z
-                esac
-                ;;
-            arch)
-                __get_os_arch_from_uname ||
-                __get_os_arch_from_arch  ||
-                __get_os_arch_from_getprop
-                ;;
-            libc)
-                case $(os kind) in
-                    android) echo bionic ;;
-                    linux)
-                        # https://pubs.opengroup.org/onlinepubs/7908799/xcu/getconf.html
-                        if command -v getconf > /dev/null ; then
-                            if getconf GNU_LIBC_VERSION > /dev/null 2>&1 ; then
-                                echo glibc
-                                return 0
-                            fi
-                        fi
-                        if command -v ldd > /dev/null ; then
-                            if ldd --version 2>&1 | head -n 1 | grep -q GLIBC ; then
-                                echo glibc
-                                return 0
-                            fi
-                            if ldd --version 2>&1 | head -n 1 | grep -q musl ; then
-                                echo musl
-                                return 0
-                            fi
-                        fi
-                        return 1
-                esac
+                __get_os_name_from_os_type $(os type)
                 ;;
             vers)
-                case $(os kind) in
-                    freebsd) freebsd-version ;;
-                    openbsd) uname -r ;;
-                    netbsd)  uname -r ;;
-                    darwin)  sw_vers -productVersion ;;
-                    linux)
-                        __get_os_version_from_uname_a ||
-                        __get_os_version_from_etc_os_release ||
-                        __get_os_version_from_lsb_release
-                        ;;
-                    android)
-                        __get_os_version_from_getprop ;;
-                    windows)
-                        systeminfo | grep 'OS Version:' | cut -d: -f2 | head -n 1 | sed 's/^[[:space:]]*//' | cut -d ' ' -f1 ;;
-                esac
+                __get_os_version_from_os_type $(os type)
                 ;;
-            *)  echo "$1: not support item."; return 1
+            subs)
+                __get_os_sub_system
+                ;;
+            arch)
+                __get_os_arch
+                ;;
+            libc)
+                __get_os_libc_from_os_type $(os type)
+                ;;
+            *)  echo "unrecognized argument: $1" >&2; return 1
         esac
     else
-        echo "os command only support one item."; return 1
+        echo "os command only support one argument." >&2; return 1
     fi
 }
 
@@ -1152,8 +1178,10 @@ version_of_package() {
 # https://cygwin.com/packages/package_list.html
 get_choco_package_name_by_command_name() {
     case $1 in
-      cc|gcc) echo 'gcc-g++' ;;
-       gmake) echo 'make' ;;
+          go) echo 'golang';;
+      cc|gcc|c++|g++)
+              echo 'gcc-g++' ;;
+       gmake) echo 'make'  ;;
          gm4) echo 'm4'    ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
@@ -1173,11 +1201,13 @@ get_choco_package_name_by_command_name() {
 
 get_pkg_add_package_name_by_command_name() {
     case $1 in
+          go) echo 'golang';;
           cc) echo 'gcc'   ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
         make) echo 'gmake' ;;
         perl) echo 'perl5' ;;
-       gperf) echo 'gperf' ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
@@ -1205,7 +1235,10 @@ get_pkg_add_package_name_by_command_name() {
 
 get_pkgin_package_name_by_command_name() {
     case $1 in
+          go) echo 'golang';;
           cc) echo 'gcc'   ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
         make) echo 'gmake' ;;
         perl) echo 'perl5' ;;
@@ -1230,7 +1263,10 @@ get_pkgin_package_name_by_command_name() {
 
 get_pkg_package_name_by_command_name() {
     case $1 in
+          go) echo 'golang';;
           cc) echo 'gcc'   ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
         make) echo 'gmake' ;;
         perl) echo 'perl5' ;;
@@ -1253,7 +1289,10 @@ get_pkg_package_name_by_command_name() {
 
 get_emerge_package_name_by_command_name() {
     case $1 in
-          cc) echo 'gcc' ;;
+          go) echo 'golang';;
+          cc) echo 'gcc'   ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
@@ -1279,8 +1318,11 @@ get_emerge_package_name_by_command_name() {
 
 __get_pacman_package_name_by_command_name() {
     case $1 in
-          cc) echo 'gcc'      ;;
-         gm4) echo 'm4'       ;;
+          go) echo 'golang';;
+          cc) echo 'gcc'   ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
+         gm4) echo 'm4'    ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
@@ -1331,9 +1373,11 @@ get_pacman_package_name_by_command_name() {
 
 get_xbps_package_name_by_command_name() {
     case $1 in
-      cc|gcc) echo 'gcc' ;;
+          go) echo 'golang';;
+          cc) echo 'gcc'   ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
-       gperf) echo 'gperf' ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
@@ -1356,9 +1400,11 @@ get_xbps_package_name_by_command_name() {
 
 get_apk_package_name_by_command_name() {
     case $1 in
+          go) echo 'golang';;
       cc|gcc) echo 'gcc libc-dev' ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
-       gperf) echo 'gperf' ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
@@ -1383,9 +1429,11 @@ get_apk_package_name_by_command_name() {
 
 get_zypper_package_name_by_command_name() {
     case $1 in
-      cc|gcc) echo 'gcc' ;;
+          go) echo 'golang';;
+          cc) echo 'gcc'   ;;
+         c++) echo 'gcc-g++';;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
-       gperf) echo 'gperf' ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
@@ -1410,9 +1458,11 @@ get_zypper_package_name_by_command_name() {
 
 get_dnf_package_name_by_command_name() {
     case $1 in
-      cc|gcc) echo 'gcc' ;;
+          go) echo 'golang';;
+          cc) echo 'gcc'   ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
-       gperf) echo 'gperf' ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
@@ -1435,9 +1485,11 @@ get_dnf_package_name_by_command_name() {
 
 get_yum_package_name_by_command_name() {
     case $1 in
-      cc|gcc) echo 'gcc' ;;
+          go) echo 'golang';;
+          cc) echo 'gcc'   ;;
+         c++) echo 'gcc-g++';;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
-       gperf) echo 'gperf' ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
@@ -1461,9 +1513,11 @@ get_apt_get_package_name_by_command_name() {
 
 get_apt_package_name_by_command_name() {
     case $1 in
-      cc|gcc) echo 'gcc' ;;
+          go) echo 'golang';;
+          cc) echo 'gcc'   ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
-       gperf) echo 'gperf' ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
@@ -1488,9 +1542,11 @@ get_apt_package_name_by_command_name() {
 
 get_brew_package_name_by_command_name() {
     case $1 in
-      cc|gcc) echo 'gcc' ;;
+          go) echo 'golang';;
+          cc) echo 'gcc'   ;;
+         c++) echo 'g++'   ;;
+     clang++) echo 'clang' ;;
          gm4) echo 'm4'    ;;
-       gperf) echo 'gperf' ;;
         gsed) echo 'gnu-sed'  ;;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
@@ -1583,13 +1639,13 @@ __install_package_via_package_manager() {
 
     case $1 in
         pip3)
-            case $NATIVE_OS_KIND in
+            case $NATIVE_OS_TYPE in
                 *bsd|linux) run pip3 install --user -U "$2" ;;
                 *)          run pip3 install        -U "$2"
             esac
             ;;
         pip)
-            case $NATIVE_OS_KIND in
+            case $NATIVE_OS_TYPE in
                 *bsd|linux) run pip  install --user -U "$2" ;;
                 *)          run pip  install        -U "$2"
             esac
@@ -1810,7 +1866,7 @@ EOF
 
         unset __PB_COMMAND__
         unset __PB_OS_LIBC__
-        unset __PB_OS_KIND__
+        unset __PB_OS_TYPE__
         unset __PB_OS_ARCH__
         unset __PB_URL__
 
@@ -1826,9 +1882,9 @@ EOF
             continue
         fi
 
-        __PB_OS_KIND__=$(echo "$LINE" | cut -d '|' -f3)
+        __PB_OS_TYPE__=$(echo "$LINE" | cut -d '|' -f3)
 
-        if [ "$__PB_OS_KIND__" != "$NATIVE_OS_KIND" ] ; then
+        if [ "$__PB_OS_TYPE__" != "$NATIVE_OS_TYPE" ] ; then
             continue
         fi
 
@@ -1961,7 +2017,7 @@ handle_dependency() {
 }
 
 __handle_required_dependencies() {
-    [ "$DEBUG" = 'true' ] && step "handle required dependencies"
+    step "handle required dependencies"
 
     for dependency in $REQUIRED_DEPENDENCY_LIST
     do
@@ -2259,10 +2315,10 @@ EOF
     unset STEP_NUM
     unset STEP_MESSAGE
 
-    unset NATIVE_OS_KIND
     unset NATIVE_OS_TYPE
     unset NATIVE_OS_NAME
     unset NATIVE_OS_VERS
+    unset NATIVE_OS_SUBS
     unset NATIVE_OS_ARCH
     unset NATIVE_OS_LIBC
 
@@ -2289,18 +2345,18 @@ EOF
         handle_dependency $(__decode_dependency "$dependency") || return 1
     done
 
-    NATIVE_OS_KIND=$(os kind)
     NATIVE_OS_TYPE=$(os type)
     NATIVE_OS_NAME=$(os name)
     NATIVE_OS_VERS=$(os vers)
+    NATIVE_OS_SUBS=$(os subs)
     NATIVE_OS_ARCH=$(os arch)
     NATIVE_OS_LIBC=$(os libc)
 
     step "show current machine os info"
-    echo "NATIVE_OS_KIND  = $NATIVE_OS_KIND"
     echo "NATIVE_OS_TYPE  = $NATIVE_OS_TYPE"
     echo "NATIVE_OS_NAME  = $NATIVE_OS_NAME"
     echo "NATIVE_OS_VERS  = $NATIVE_OS_VERS"
+    echo "NATIVE_OS_SUBS  = $NATIVE_OS_SUBS"
     echo "NATIVE_OS_ARCH  = $NATIVE_OS_ARCH"
     echo "NATIVE_OS_LIBC  = $NATIVE_OS_LIBC"
 
@@ -2313,11 +2369,9 @@ EOF
         echo "$item" | tr '|' ' '
     done
 
-    case $NATIVE_OS_KIND in
-        windows) ;;
-	android) ;;
-	*) [ "$(whoami)" = root ] || sudo=sudo
-    esac
+    if [ "$NATIVE_OS_TYPE" != windows ] && [ "$NATIVE_OS_SUBS" != termux ] ; then
+        [ "$(whoami)" = root ] || sudo=sudo
+    fi
 
     regist_dependency required command git
     regist_dependency required command curl
