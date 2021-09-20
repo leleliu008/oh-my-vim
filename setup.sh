@@ -1526,11 +1526,12 @@ get_apt_package_name_by_command_name() {
     realpath) echo 'coreutils';;
       protoc) echo 'protobuf' ;;
       ps2pdf) echo "ghostscript" ;;
+     python3) echo 'python3 python3-dev' ;;
+    pip3|pip) echo "python3-pip" ;;
       rst2man|rst2html)
               echo "python3-docutils" ;;
     sphinx-build)
               echo "python3-sphinx" ;;
-    pip3|pip) echo "python3-pip" ;;
     glibtool|libtoolize|glibtoolize)
                 echo "libtool"  ;;
     autoreconf) echo "autoconf" ;;
@@ -1691,7 +1692,7 @@ __install_command_via_package_manager() {
 
     package_exists_in_repo_and_version_matched "$1" "$__PACKAGE_NAME__" $3 $4 || return 1
 
-    print "🔥  ${COLOR_YELLOW}required command${COLOR_OFF} ${COLOR_GREEN}$(shiftn 1 $@)${COLOR_OFF}${COLOR_YELLOW}, but${COLOR_OFF} ${COLOR_GREEN}$2${COLOR_OFF} ${COLOR_YELLOW}command not found, try to install it via${COLOR_OFF} ${COLOR_GREEN}$1${COLOR_OFF}\n"
+    print "🔥  ${COLOR_GREEN}$(shiftn 1 $@)${COLOR_OFF} ${COLOR_YELLOW}command is required, but${COLOR_OFF} ${COLOR_GREEN}$2${COLOR_OFF} ${COLOR_YELLOW}command is not found, we will install it via${COLOR_OFF} ${COLOR_GREEN}$1${COLOR_OFF}\n"
 
     __install_package_via_package_manager "$1" "$__PACKAGE_NAME__" $3 $4
 }
@@ -1774,7 +1775,7 @@ __install_command_via_fetch_prebuild_binary() {
 
     handle_dependency_from_url "$PREBUILD_BINARY_FETCH_URL"
 
-    print "🔥  ${COLOR_YELLOW}required command${COLOR_OFF} ${COLOR_GREEN}$@${COLOR_OFF}${COLOR_YELLOW}, but${COLOR_OFF} ${COLOR_GREEN}$1${COLOR_OFF} ${COLOR_YELLOW}command not found, try to install it via${COLOR_OFF} ${COLOR_GREEN}fetch prebuild binary${COLOR_OFF}\n"
+    print "🔥  ${COLOR_GREEN}$@${COLOR_OFF} ${COLOR_YELLOW}command is required, but${COLOR_OFF} ${COLOR_GREEN}$1${COLOR_OFF} ${COLOR_YELLOW}command is not found, we will install it via${COLOR_OFF} ${COLOR_GREEN}fetch prebuild binary${COLOR_OFF}\n"
 
     unset PREBUILD_BINARY_FETCH_URL
     PREBUILD_BINARY_FETCH_URL=$(__get_prebuild_binary_fetch_url_by_command_name "$1")
@@ -1916,7 +1917,7 @@ __install_command_via_run_install_script() {
                 return 1
             fi
 
-            print "🔥  ${COLOR_YELLOW}required command${COLOR_OFF} ${COLOR_GREEN}$1${COLOR_OFF}${COLOR_YELLOW}, but${COLOR_OFF} ${COLOR_GREEN}$1${COLOR_OFF} ${COLOR_YELLOW}command not found, try to install it via running install script.${COLOR_OFF}\n"
+            print "🔥  ${COLOR_GREEN}$1${COLOR_OFF} ${COLOR_YELLOW}command is required, but${COLOR_OFF} ${COLOR_GREEN}$1${COLOR_OFF} ${COLOR_YELLOW}command is not found, we will install it via running install script.${COLOR_OFF}\n"
 
             unset __RUSTUP_INSTALL_SCRIPT_DIR__
             __RUSTUP_INSTALL_SCRIPT_DIR__=$(mktemp -d) || return 1
@@ -2146,7 +2147,7 @@ python_module() {
         install)
             [ -z "$2" ] && die "please specify a python module name."
             if ! python_module is installed "$2" ; then
-                warn "required python module ${COLOR_GREEN}$2${COLOR_OFF}, but ${COLOR_GREEN}$2${COLOR_OFF} python module not found, try to install it via ${COLOR_GREEN}$__PIP_COMMAND__${COLOR_OFF}"
+                print "🔥  ${COLOR_GREEN}$2${COLOR_OFF} ${COLOR_YELLOW}python module is required, but${COLOR_OFF} ${COLOR_GREEN}$2${COLOR_OFF} ${COLOR_YELLOW}python module is not found, we will install it via${COLOR_OFF} ${COLOR_GREEN}$__PIP_COMMAND__${COLOR_OFF}"
                 run "$__PIP_COMMAND__" install -U pip  || return 1
                 run "$__PIP_COMMAND__" install -U "$2" || return 1
             fi
@@ -2376,7 +2377,7 @@ EOF
     regist_dependency required command git
     regist_dependency required command curl
     regist_dependency required command bash:zsh
-    regist_dependency required command python3:python3.9:python3.8:python3.7:python3.6:python3.5:python
+    regist_dependency required command python3:python3.9:python3.8:python3.7:python3.6:python ge 3.6.0
     regist_dependency required command cc:clang
     regist_dependency required command c++:clang++
     regist_dependency required command cmake
