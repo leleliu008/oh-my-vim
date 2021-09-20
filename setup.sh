@@ -1289,7 +1289,6 @@ get_pkg_package_name_by_command_name() {
 
 get_emerge_package_name_by_command_name() {
     case $1 in
-          go) echo 'golang';;
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
      clang++) echo 'clang' ;;
@@ -1318,7 +1317,6 @@ get_emerge_package_name_by_command_name() {
 
 __get_pacman_package_name_by_command_name() {
     case $1 in
-          go) echo 'golang';;
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
      clang++) echo 'clang' ;;
@@ -1373,7 +1371,6 @@ get_pacman_package_name_by_command_name() {
 
 get_xbps_package_name_by_command_name() {
     case $1 in
-          go) echo 'golang';;
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
      clang++) echo 'clang' ;;
@@ -1400,7 +1397,6 @@ get_xbps_package_name_by_command_name() {
 
 get_apk_package_name_by_command_name() {
     case $1 in
-          go) echo 'golang';;
       cc|gcc) echo 'gcc libc-dev' ;;
          c++) echo 'g++'   ;;
      clang++) echo 'clang' ;;
@@ -1429,7 +1425,6 @@ get_apk_package_name_by_command_name() {
 
 get_zypper_package_name_by_command_name() {
     case $1 in
-          go) echo 'golang';;
           cc) echo 'gcc'   ;;
          c++) echo 'gcc-g++';;
      clang++) echo 'clang' ;;
@@ -1543,7 +1538,6 @@ get_apt_package_name_by_command_name() {
 
 get_brew_package_name_by_command_name() {
     case $1 in
-          go) echo 'golang';;
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
      clang++) echo 'clang' ;;
