@@ -1463,7 +1463,7 @@ get_package_name_by_command_name_from_package_manager_apk() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_zyyper() {
+get_package_name_by_command_name_from_package_manager_zypper() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'gcc-g++';;
@@ -2405,6 +2405,7 @@ EOF
     fi
 
     regist_dependency required exe git
+    regist_dependency required exe curl
     regist_dependency required exe python3:python3.9:python3.8:python3.7:python3.6:python ge 3.6.0
     regist_dependency required exe clang
     regist_dependency required exe clang++
