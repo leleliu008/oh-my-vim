@@ -546,17 +546,43 @@ fetch() {
                         run "curl --fail --retry 20 --retry-delay 30 --location -o '$FETCH_OUTPUT_PATH' '$FETCH_URL' | $FETCH_PIPE_TO_CMD"
                     fi
                     ;;
-                wget)  run wget --timeout=60 -O "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
-                http)  run http --timeout=60 -o "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
-                lynx)
-                    if [ "$FETCH_OUTPUT_PATH" = '-' ] ; then
-                        run lynx -source "$FETCH_URL"
+                wget)
+                    if [ -z "$FETCH_PIPE_TO_CMD" ] ; then
+                        run wget --timeout=60 -O "$FETCH_OUTPUT_PATH" "'$FETCH_URL'"
                     else
-                        run lynx -source "$FETCH_URL" > "\"$FETCH_OUTPUT_PATH\""
+                        run "wget --timeout=60 -O '$FETCH_OUTPUT_PATH '$FETCH_URL' | $FETCH_PIPE_TO_CMD"
                     fi
                     ;;
-                aria2c)run aria2c -d "$FETCH_OUTPUT_DIR" -o "$FETCH_OUTPUT_NAME" "'$FETCH_URL'" ;;
-                axel)  run axel -o "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
+                http)
+                    if [ -z "$FETCH_PIPE_TO_CMD" ] ; then
+                        run "http --timeout=60 -o '$FETCH_OUTPUT_PATH' '$FETCH_URL'"
+                    else
+                        run "http --timeout=60 -o '$FETCH_OUTPUT_PATH' '$FETCH_URL' | $FETCH_PIPE_TO_CMD"
+                    fi
+                    ;;
+                lynx)
+                    if [ -z "$FETCH_PIPE_TO_CMD" ] ; then
+                        run "lynx -source '$FETCH_URL' > '$FETCH_OUTPUT_PATH'"
+                    else
+                        run "lynx -source '$FETCH_URL' | $FETCH_PIPE_TO_CMD"
+                    fi
+                    ;;
+                aria2c)
+                    if [ -z "$FETCH_PIPE_TO_CMD" ] ; then
+                        run "aria2c -d '$FETCH_OUTPUT_DIR' -o '$FETCH_OUTPUT_NAME' '$FETCH_URL'"
+                    else
+                        run "aria2c -d '$FETCH_OUTPUT_DIR' -o '$FETCH_OUTPUT_NAME' '$FETCH_URL' | $FETCH_PIPE_TO_CMD"
+                    fi
+                    ;;
+                axel)
+                    if [ -z "$FETCH_PIPE_TO_CMD" ] ; then
+                        run "axel -o '$FETCH_OUTPUT_PATH' '$FETCH_URL'"
+                    else
+                        run "axel -o '$FETCH_OUTPUT_PATH' '$FETCH_URL' | $FETCH_PIPE_TO_CMD"
+                    fi
+                    ;;
+                *)  die "fetch() unimplementation: $FETCH_TOOL"
+                    ;;
             esac
 
             [ $? -eq 0 ] || return 1
@@ -1937,7 +1963,7 @@ __install_command_via_run_install_script() {
 }
 
 __install_command_via_pip() {
-    [ -z "$(get_pip3_package_name_by_command_name "$1")" ] && return 1
+    [ -z "$(get_package_name_by_command_name_pip3 "$1")" ] && return 1
 
     handle_dependency required exe pip3:pip
 
@@ -1951,9 +1977,9 @@ __install_command_via_pip() {
     )
 
     if   command_exists_in_filesystem pip3 ; then
-        __install_package_via_package_manager pip3 "$(get_pip3_package_name_by_command_name "$1")"
+        __install_package_via_package_manager pip3 "$(get_package_name_by_command_name_from_package_manager_pip3 "$1")"
     elif command_exists_in_filesystem pip ; then
-        __install_package_via_package_manager pip  "$(get_pip3_package_name_by_command_name "$1")"
+        __install_package_via_package_manager pip  "$(get_package_name_by_command_name_pip "$1")"
     else
         return 1
     fi
