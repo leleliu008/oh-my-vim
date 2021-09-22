@@ -418,75 +418,6 @@ die_if_map_key__is_not_specified() {
 ##############################################################################
 # {{{ fetch
 
-__get_available_fetch_tool() {
-    for tool in curl wget http lynx aria2c axel
-    do
-        if command_exists_in_filesystem "$tool" ; then
-            echo "$tool"
-            return 0
-        fi
-    done
-    return 1
-}
-
-__fetch_via_git() {
-    if [ -d "$FETCH_OUTPUT_PATH" ] ; then
-        run cd  "$FETCH_OUTPUT_PATH" || return 1
-        if      git rev-parse 2> /dev/null ; then
-            run git pull &&
-            run git submodule update --recursive
-        else
-            run cd .. &&
-            run rm -rf "$FETCH_OUTPUT_NAME" &&
-            run git clone --recursive "$FETCH_URL" "$FETCH_OUTPUT_NAME"
-        fi
-    else
-        if [ ! -d "$FETCH_OUTPUT_DIR" ] ; then
-            run install -d "$FETCH_OUTPUT_DIR" || return 1
-        fi
-        run cd "$FETCH_OUTPUT_DIR" || return 1
-        run git clone --recursive "$FETCH_URL" "$FETCH_OUTPUT_NAME"
-    fi
-}
-
-__fetch_archive_via_tools() {
-    if [ -f "$FETCH_OUTPUT_PATH" ] ; then
-        if [ -n "$FETCH_SHA256" ] ; then
-            if file_exists_and_sha256sum_matched "$FETCH_OUTPUT_PATH" "$FETCH_SHA256" ; then
-                success "$FETCH_OUTPUT_PATH already have been downloaded."
-                return 0
-            fi
-        fi
-        rm -f "$FETCH_OUTPUT_PATH"
-    fi
-
-    AVAILABLE_FETCH_TOOL=$(__get_available_fetch_tool)
-
-    if [ -z "$AVAILABLE_FETCH_TOOL" ] ; then
-        handle_dependency required command curl || return 1
-        if command_exists_in_filesystem curl ; then
-            AVAILABLE_FETCH_TOOL=curl
-        else
-            return 1
-        fi
-    fi
-
-    case $AVAILABLE_FETCH_TOOL in
-        curl)  run curl --fail --retry 20 --retry-delay 30 --location -o "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
-        wget)  run wget --timeout=60 -O "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
-        http)  run http --timeout=60 -o "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
-        lynx)  run lynx -source "$FETCH_URL" > "\"$FETCH_OUTPUT_PATH\"" ;;
-        aria2c)run aria2c -d "$FETCH_OUTPUT_DIR" -o "$FETCH_OUTPUT_NAME" "'$FETCH_URL'" ;;
-        axel)  run axel -o "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
-    esac
-
-    [ $? -eq 0 ] || return 1
-
-    if [ -n "$FETCH_SHA256" ] ; then
-        die_if_sha256sum_mismatch "$FETCH_OUTPUT_PATH" "$FETCH_SHA256"
-    fi
-}
-
 # fetch <URL> [--sha256=SHA256] <--output-path=PATH>
 # fetch <URL> [--sha256=SHA256] <--output-dir=DIR> <--output-name=NAME>
 # fetch <URL> [--sha256=SHA256] <--output-dir=DIR> [--output-name=NAME]
@@ -497,9 +428,10 @@ fetch() {
     unset FETCH_OUTPUT_DIR
     unset FETCH_OUTPUT_NAME
     unset FETCH_OUTPUT_PATH
+    unset FETCH_PIPE_TO_CMD
 
     if [ -z "$1" ] ; then
-        die "please specify a fetch url."
+        die "fetch() please specify a url."
     else
         FETCH_URL="$1"
     fi
@@ -515,41 +447,123 @@ fetch() {
             --output-dir=*)
                 FETCH_OUTPUT_DIR=$(getvalue "$1")
                 if [ -z "$FETCH_OUTPUT_DIR" ] ; then
-                    die "--output-dir argument's value must be not empty."
+                    die "fetch() --output-dir argument's value must be not empty."
                 fi
                 ;;
             --output-name=*)
                 FETCH_OUTPUT_NAME=$(getvalue "$1")
                 if [ -z "$FETCH_OUTPUT_NAME" ] ; then
-                    die "--output-name argument's value must be not empty."
+                    die "fetch() --output-name argument's value must be not empty."
                 fi
                 ;;
             --output-path=*)
                 FETCH_OUTPUT_PATH=$(getvalue "$1")
                 if [ -z "$FETCH_OUTPUT_PATH" ] ; then
-                    die "--output-path argument's value must be not empty."
+                    die "fetch() --output-path argument's value must be not empty."
+                fi
+                ;;
+            --pipe=*)
+                FETCH_PIPE_TO_CMD=$(getvalue "$1")
+                if [ -z "$FETCH_PIPE_TO_CMD" ] ; then
+                    die "fetch() --pipe=CMD argument's value must be not empty."
                 fi
         esac
         shift
     done
 
     if [ -z "$FETCH_OUTPUT_PATH" ] ; then
-        [ -z "$FETCH_OUTPUT_DIR" ]  && FETCH_OUTPUT_DIR="$PWD"
-        [ -z "$FETCH_OUTPUT_NAME" ] && FETCH_OUTPUT_NAME=$(basename "$FETCH_URL")
-
-        FETCH_OUTPUT_PATH="$FETCH_OUTPUT_DIR/$FETCH_OUTPUT_NAME"
+        if [ -z "$FETCH_OUTPUT_DIR" ] && [ -z "$FETCH_OUTPUT_NAME" ] ; then
+            FETCH_OUTPUT_PATH='-'
+        else
+            [ -z "$FETCH_OUTPUT_DIR" ]  && FETCH_OUTPUT_DIR="$PWD"
+            [ -z "$FETCH_OUTPUT_NAME" ] && FETCH_OUTPUT_NAME=$(basename "$FETCH_URL")
+            FETCH_OUTPUT_PATH="$FETCH_OUTPUT_DIR/$FETCH_OUTPUT_NAME"
+            if [ ! -d "$FETCH_OUTPUT_DIR" ] ; then
+                run install -d "$FETCH_OUTPUT_DIR"
+            fi
+        fi
+    elif [ "$FETCH_OUTPUT_PATH" = '-' ] ; then
+        unset FETCH_OUTPUT_DIR
+        unset FETCH_OUTPUT_NAME
     else
         FETCH_OUTPUT_DIR="$(dirname $FETCH_OUTPUT_PATH)"
         FETCH_OUTPUT_NAME="$(basename $FETCH_OUTPUT_PATH)"
-    fi
-
-    if [ ! -d "$FETCH_OUTPUT_DIR" ] ; then
-        run install -d "$FETCH_OUTPUT_DIR"
+        if [ ! -d "$FETCH_OUTPUT_DIR" ] ; then
+            run install -d "$FETCH_OUTPUT_DIR"
+        fi
     fi
 
     case $FETCH_URL in
-        *.git) __fetch_via_git ;;
-        *)     __fetch_archive_via_tools ;;
+        *.git)
+            if [ -d "$FETCH_OUTPUT_PATH" ] ; then
+                run cd  "$FETCH_OUTPUT_PATH" || return 1
+                if      git rev-parse 2> /dev/null ; then
+                    run git pull &&
+                    run git submodule update --recursive
+                else
+                    run cd .. &&
+                    run rm -rf "$FETCH_OUTPUT_NAME" &&
+                    run git clone --recursive "$FETCH_URL" "$FETCH_OUTPUT_NAME"
+                fi
+            else
+                if [ ! -d "$FETCH_OUTPUT_DIR" ] ; then
+                    run install -d "$FETCH_OUTPUT_DIR" || return 1
+                fi
+                run cd "$FETCH_OUTPUT_DIR" || return 1
+                run git clone --recursive "$FETCH_URL" "$FETCH_OUTPUT_NAME"
+            fi
+            ;;
+        *)
+            if [ "$FETCH_OUTPUT_PATH" != '-' ] && [ -f "$FETCH_OUTPUT_PATH" ] ; then
+                if [ -n "$FETCH_SHA256" ] ; then
+                    if file_exists_and_sha256sum_matched "$FETCH_OUTPUT_PATH" "$FETCH_SHA256" ; then
+                        success "$FETCH_OUTPUT_PATH already have been downloaded."
+                        return 0
+                    fi
+                fi
+                rm -f "$FETCH_OUTPUT_PATH"
+            fi
+
+            for FETCH_TOOL in curl wget http lynx aria2c axel
+            do
+                if command -v "$FETCH_TOOL" > /dev/null ; then
+                    break
+                else
+                    unset FETCH_TOOL
+                fi
+            done
+
+            [ -z "$FETCH_TOOL" ] && {
+                handle_dependency required exe curl
+                FETCH_TOOL=curl
+            }
+
+            case $FETCH_TOOL in
+                curl)
+                    if [ -z "$FETCH_PIPE_TO_CMD" ] ; then
+                        run "curl --fail --retry 20 --retry-delay 30 --location -o '$FETCH_OUTPUT_PATH' '$FETCH_URL'"
+                    else
+                        run "curl --fail --retry 20 --retry-delay 30 --location -o '$FETCH_OUTPUT_PATH' '$FETCH_URL' | $FETCH_PIPE_TO_CMD"
+                    fi
+                    ;;
+                wget)  run wget --timeout=60 -O "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
+                http)  run http --timeout=60 -o "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
+                lynx)
+                    if [ "$FETCH_OUTPUT_PATH" = '-' ] ; then
+                        run lynx -source "$FETCH_URL"
+                    else
+                        run lynx -source "$FETCH_URL" > "\"$FETCH_OUTPUT_PATH\""
+                    fi
+                    ;;
+                aria2c)run aria2c -d "$FETCH_OUTPUT_DIR" -o "$FETCH_OUTPUT_NAME" "'$FETCH_URL'" ;;
+                axel)  run axel -o "$FETCH_OUTPUT_PATH" "'$FETCH_URL'" ;;
+            esac
+
+            [ $? -eq 0 ] || return 1
+
+            if [ "$FETCH_OUTPUT_PATH" != '-' ] && [ -n "$FETCH_SHA256" ] ; then
+                die_if_sha256sum_mismatch "$FETCH_OUTPUT_PATH" "$FETCH_SHA256"
+            fi
     esac
 }
 
@@ -571,7 +585,7 @@ __upgrade_self() {
         elif command -v readlink > /dev/null && readlink -f xx > /dev/null 2>&1 ; then
             CURRENT_SCRIPT_REALPATH=$(readlink -f $CURRENT_SCRIPT_FILEPATH)
         else
-            handle_dependency required command realpath
+            handle_dependency required exe realpath
             CURRENT_SCRIPT_REALPATH=$(realpath $CURRENT_SCRIPT_FILEPATH)
         fi
     else
@@ -629,7 +643,7 @@ __integrate_zsh_completions() {
         elif command -v readlink > /dev/null && readlink -f xx > /dev/null 2>&1 ; then
             ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH=$(readlink -f $ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH)
         else
-            handle_dependency required command realpath
+            handle_dependency required exe realpath
             ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH=$(realpath $ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH)
         fi
     fi
@@ -773,7 +787,7 @@ __get_os_type_from_uname() {
         mingw32*) echo "windows" ;;
         mingw64*) echo "windows" ;;
         cygwin*)  echo 'windows' ;;
-        *)        echo "$1" 
+        *)        echo "$1"
     esac
 }
 
@@ -795,7 +809,7 @@ __get_os_name_from_os_type() {
         windows)
             systeminfo | grep 'OS Name:' | cut -d: -f2 | head -n 1 | sed 's/^[[:space:]]*//'
             ;;
-        *) echo "$1" 
+        *) echo "$1"
     esac
 }
 
@@ -1178,12 +1192,12 @@ version_of_package() {
 # https://cygwin.com/packages/package_list.html
 get_choco_package_name_by_command_name() {
     case $1 in
-          go) echo 'golang';;
+          go) echo 'golang' ;;
       cc|gcc|c++|g++)
-              echo 'gcc-g++' ;;
-       gmake) echo 'make'  ;;
-         gm4) echo 'm4'    ;;
-        gsed) echo 'gnu-sed'  ;;
+              echo 'gcc-g++';;
+       gmake) echo 'make'   ;;
+         gm4) echo 'm4'     ;;
+        gsed) echo 'gnu-sed';;
         find) echo 'findutils';;
         diff) echo 'diffutils';;
      objcopy) echo 'binutils' ;;
@@ -1525,7 +1539,7 @@ get_apt_package_name_by_command_name() {
       ps2pdf) echo "ghostscript" ;;
      python3) echo 'python3 python3-dev' ;;
     pip3|pip) echo "python3-pip" ;;
-      rst2man|rst2html)
+    rst2man|rst2html)
               echo "python3-docutils" ;;
     sphinx-build)
               echo "python3-sphinx" ;;
@@ -1718,31 +1732,31 @@ __install_command_via_available_package_manager() {
 handle_dependency_from_url() {
     case $1 in
         *.zip)
-            handle_dependency required command unzip
+            handle_dependency required exe unzip
             ;;
         *.tar.xz)
-            handle_dependency required command tar
-            handle_dependency required command xz
+            handle_dependency required exe tar
+            handle_dependency required exe xz
             ;;
         *.tar.gz)
-            handle_dependency required command tar
-            handle_dependency required command gzip
+            handle_dependency required exe tar
+            handle_dependency required exe gzip
             ;;
         *.tar.lz)
-            handle_dependency required command tar
-            handle_dependency required command lzip
+            handle_dependency required exe tar
+            handle_dependency required exe lzip
             ;;
         *.tar.bz2)
-            handle_dependency required command tar
-            handle_dependency required command bzip2
+            handle_dependency required exe tar
+            handle_dependency required exe bzip2
             ;;
         *.tgz)
-            handle_dependency required command tar
-            handle_dependency required command gzip
+            handle_dependency required exe tar
+            handle_dependency required exe gzip
             ;;
         *.txz)
-            handle_dependency required command tar
-            handle_dependency required command xz
+            handle_dependency required exe tar
+            handle_dependency required exe xz
     esac
 }
 
@@ -1901,28 +1915,25 @@ __install_command_via_run_install_script() {
     case $1 in
         rustup)
             # https://www.rust-lang.org/tools/install
+            print "🔥  ${COLOR_GREEN}$1${COLOR_OFF} ${COLOR_YELLOW}command is required, but it is not found, I will install it via running shell script.${COLOR_OFF}\n"
 
-            unset __RUSTUP_INSTALL_SCRIPT_RUN_SHELL__
-            __RUSTUP_INSTALL_SCRIPT_RUN_SHELL__=$(command -v bash || command -v zsh || command -v dash)
-            if [ -z "$__RUSTUP_INSTALL_SCRIPT_RUN_SHELL__" ] ; then
-                handle_dependency required command bash || return 1
-            fi
-            __RUSTUP_INSTALL_SCRIPT_RUN_SHELL__=$(command -v bash)
-            if [ -z "$__RUSTUP_INSTALL_SCRIPT_RUN_SHELL__" ] ; then
-                warn "install bash failed."
-                return 1
-            fi
+            handle_dependency required exe bash:zsh
 
-            print "🔥  ${COLOR_GREEN}$1${COLOR_OFF} ${COLOR_YELLOW}command is required, but it is not found, I will install it via running install script.${COLOR_OFF}\n"
-
-            unset __RUSTUP_INSTALL_SCRIPT_DIR__
-            __RUSTUP_INSTALL_SCRIPT_DIR__=$(mktemp -d) || return 1
-            fetch 'https://sh.rustup.rs' --output-dir="$__RUSTUP_INSTALL_SCRIPT_DIR__" --output-name='rustup-init' || return 1
-
-            run "$__RUSTUP_INSTALL_SCRIPT_RUN_SHELL__ $__RUSTUP_INSTALL_SCRIPT_DIR__/rustup-init -y" || return 1
+            fetch 'https://sh.rustup.rs' --pipe="$(command -v bash || command -v zsh || command -v dash || command -v ash || echo sh)"
 
             export CARGO_HOME=$HOME/.cargo
             export PATH="$CARGO_HOME/bin:$PATH"
+            ;;
+        nvm)
+            # https://github.com/nvm-sh/nvm
+            print "🔥  ${COLOR_GREEN}$1${COLOR_OFF} ${COLOR_YELLOW}command is required, but it is not found, I will install it via running bash shell script.${COLOR_OFF}\n"
+
+            handle_dependency required exe bash:zsh
+
+	        fetch "$(github_user_content_base_url)/nvm-sh/nvm/master/install.sh" --pipe="$(command -v bash || command -v zsh || echo bash)"
+
+	        export NVM_DIR="${HOME}/.nvm"
+	        . "${HOME}/.nvm/nvm.sh"
             ;;
         *)  return 1
     esac
@@ -1931,7 +1942,7 @@ __install_command_via_run_install_script() {
 __install_command_via_pip() {
     [ -z "$(get_pip3_package_name_by_command_name "$1")" ] && return 1
 
-    handle_dependency required command pip3:pip
+    handle_dependency required exe pip3:pip
 
     (
         unset __PIP_COMMAND__
@@ -1965,20 +1976,20 @@ __install_command() {
 }
 
 # examples:
-# handle_dependency required command   pkg-config ge 0.18
-# handle_dependency required command   python     ge 3.5
-# handle_dependency required module.py libxml2    ge 2.19
+# handle_dependency required exe   pkg-config ge 0.18
+# handle_dependency required exe   python     ge 3.5
+# handle_dependency required py    libxml2    ge 2.19
 #
-# handle_dependency optional command   pkg-config ge 0.18
-# handle_dependency optional command   python     ge 3.5
-# handle_dependency optional module.py libxml2    ge 2.19
+# handle_dependency optional exe   pkg-config ge 0.18
+# handle_dependency optional exe   python     ge 3.5
+# handle_dependency optional py    libxml2    ge 2.19
 handle_dependency() {
     [ "$1" = 'required' ] || return 0
 
     shift
 
     case $1 in
-        command)
+        exe)
             shift
             case $1 in
                 *:*)
@@ -2001,15 +2012,15 @@ handle_dependency() {
                 *)  __install_command $@
             esac
             ;;
-        module.py)
+        py)
             shift
             python_module install "$1"
             ;;
-        module.pl)
+        pm)
             shift
             perl_module install "$1"
             ;;
-        *) die "$1 not support."
+        *) die "handle_dependency() unrecognized argument:$1"
     esac
 }
 
@@ -2027,28 +2038,28 @@ __handle_required_dependencies() {
 # {{{ __printf_dependencies
 
 # examples:
-# __printf_dependency required command   pkg-config ge 0.18
-# __printf_dependency required command   python     ge 3.5
-# __printf_dependency required module.py libxml2    ge 2.19
+# __printf_dependency required exe   pkg-config ge 0.18
+# __printf_dependency required exe   python     ge 3.5
+# __printf_dependency required py    libxml2    ge 2.19
 #
-# __printf_dependency optional command   pkg-config ge 0.18
-# __printf_dependency optional command   python     ge 3.5
-# __printf_dependency optional module.py libxml2    ge 2.19
+# __printf_dependency optional exe   pkg-config ge 0.18
+# __printf_dependency optional exe   python     ge 3.5
+# __printf_dependency optional py    libxml2    ge 2.19
 __printf_dependency() {
     printf "%-10s %-15s %-2s %-10s %-10s %s\n" "$1" "$2" "$3" "$4" "$5" "$6"
 }
 
 # examples:
-# printf_dependency required command   pkg-config ge 0.18
-# printf_dependency required command   python     ge 3.5
-# printf_dependency required module.py libxml2    ge 2.19
+# printf_dependency required exe   pkg-config ge 0.18
+# printf_dependency required exe   python     ge 3.5
+# printf_dependency required py    libxml2    ge 2.19
 #
-# printf_dependency optional command   pkg-config ge 0.18
-# printf_dependency optional command   python     ge 3.5
-# printf_dependency optional module.py libxml2    ge 2.19
+# printf_dependency optional exe   pkg-config ge 0.18
+# printf_dependency optional exe   python     ge 3.5
+# printf_dependency optional py    libxml2    ge 2.19
 printf_dependency() {
     case $2 in
-        command)
+        exe)
             case $3 in
                 *:*)
                     if [ "$1" = 'required' ] ; then
@@ -2064,13 +2075,13 @@ printf_dependency() {
                 *)  __printf_dependency "$2" "$3" "$4" "$5" "$(version_of_command $3)" "$(command -v $3)"
             esac
             ;;
-        module.py)
+        py)
             __printf_dependency "$2" "$3" "$4" "$5" "$(python_module get version "$item")" "$(python_module get location "$item")"
             ;;
-        module.pl)
+        pm)
             __printf_dependency "$2" "$3" "$4" "$5" "$(perl_module get version "$item")" "$(perl_module get location "$item")"
             ;;
-        *)  die "$2: type not support."
+        *)  die "printf_dependency() unrecognized argument: $2"
     esac
 }
 
@@ -2114,8 +2125,8 @@ python_module() {
         is)
             [ $# -eq 3 ] || die "[python_module is] command accept 2 arguments."
 
-            handle_dependency required command python3:python3.9:python3.8:python3.7:python3.6:python3.5:python
-            handle_dependency required command pip3:pip3.9:pip3.8:pip3.7:pip3.6:pip3.5:pip
+            handle_dependency required exe python3:python3.9:python3.8:python3.7:python3.6:python3.5:python
+            handle_dependency required exe pip3:pip3.9:pip3.8:pip3.7:pip3.6:pip3.5:pip
 
             __PYTHON_COMMAND__=$(command -v python3 || command -v python3.9 || command -v python3.8 || command -v python3.7 || command -v python3.6 || command -v python3.5 || command -v python || echo python)
             __PIP_COMMAND__=$(command -v pip3 || command -v pip3.9 || command -v pip3.8 || command -v pip3.7 || command -v pip3.6 || command -v pip3.5 || command -v pip || echo pip)
@@ -2128,8 +2139,8 @@ python_module() {
         get)
             [ $# -eq 3 ] || die "[python_module get] command accept 2 arguments."
 
-            handle_dependency required command python3:python3.9:python3.8:python3.7:python3.6:python3.5:python
-            handle_dependency required command pip3:pip3.9:pip3.8:pip3.7:pip3.6:pip3.5:pip
+            handle_dependency required exe python3:python3.9:python3.8:python3.7:python3.6:python3.5:python
+            handle_dependency required exe pip3:pip3.9:pip3.8:pip3.7:pip3.6:pip3.5:pip
 
             __PYTHON_COMMAND__=$(command -v python3 || command -v python3.9 || command -v python3.8 || command -v python3.7 || command -v python3.6 || command -v python3.5 || command -v python || echo python)
             __PIP_COMMAND__=$(command -v pip3 || command -v pip3.9 || command -v pip3.8 || command -v pip3.7 || command -v pip3.6 || command -v pip3.5 || command -v pip || echo pip)
@@ -2165,7 +2176,7 @@ perl_module() {
     case $1 in
         is)
             [ $# -eq 4 ] || die "perl_module command accept 4 arguments."
-            handle_dependency required command perl
+            handle_dependency required exe perl
             case $2 in
                 installed)  perl -M"$3" -le 'print "installed"' > /dev/null 2>&1 ;;
                 *) die "perl_module is $2: not support."
@@ -2175,7 +2186,7 @@ perl_module() {
             ;;
         install)
             if ! perl_module is installed "$3" ; then
-                handle_dependency required command cpan:cpanm
+                handle_dependency required exe cpan:cpanm
                 if   command_exists_in_filesystem cpan  ; then
                     cpan -i "$3"
                 elif command_exists_in_filesystem cpanm ; then
@@ -2213,16 +2224,16 @@ __decode_dependency() {
 ##############################################################################
 # {{{ regist dependency
 
-# regist dependency
+# regist dependency required|optional exe|lib|dev|py|pm|pip|npm|gem|pub|cargo|go NAME
 #
 # required this is a required dependency
 # optional this is a optional dependency
 #
-# command  this dependency is a command
-# python   this dependency is a python  module
-# python2  this dependency is a python2 module
-# python3  this dependency is a python3 module
-# perl     this dependency is a perl module
+# exe  this dependency is a command
+# py   this dependency is a python  module
+# py2  this dependency is a python2 module
+# py3  this dependency is a python3 module
+# pm   this dependency is a perl module
 #
 # gt VERSION
 # ge VERSION
@@ -2232,13 +2243,13 @@ __decode_dependency() {
 # ne VERSION
 #
 # examples:
-# regist_dependency required command pkg-config ge 0.18
-# regist_dependency required command python     ge 3.5
-# regist_dependency required python  libxml2    ge 2.19
+# regist_dependency required exe pkg-config ge 0.18
+# regist_dependency required exe python     ge 3.5
+# regist_dependency required py  libxml2    ge 2.19
 #
-# regist_dependency optional command pkg-config ge 0.18
-# regist_dependency optional command python     ge 3.5
-# regist_dependency optional python  libxml2    ge 2.19
+# regist_dependency optional exe pkg-config ge 0.18
+# regist_dependency optional exe python     ge 3.5
+# regist_dependency optional py  libxml2    ge 2.19
 regist_dependency() {
     case $1 in
         required)
@@ -2262,6 +2273,8 @@ regist_dependency() {
 # {{{ main
 
 main() {
+    set -e
+
     case $1 in
         -h|--help)
             cat <<EOF
@@ -2307,8 +2320,6 @@ EOF
 	fi
     }
 
-    set -e
-
     unset STEP_NUM
     unset STEP_MESSAGE
 
@@ -2335,8 +2346,8 @@ EOF
     fi
 
     step "handle essential tools"
-    regist_dependency required command gsed:sed
-    regist_dependency required command grep
+    regist_dependency required exe gsed:sed
+    regist_dependency required exe grep
     for dependency in $REQUIRED_DEPENDENCY_LIST
     do
         handle_dependency $(__decode_dependency "$dependency") || return 1
@@ -2370,34 +2381,30 @@ EOF
         [ "$(whoami)" = root ] || sudo=sudo
     fi
 
-    regist_dependency required command git
-    regist_dependency required command curl
-    regist_dependency required command bash:zsh
-    regist_dependency required command python3:python3.9:python3.8:python3.7:python3.6:python ge 3.6.0
-    regist_dependency required command clang
-    regist_dependency required command clang++
-    regist_dependency required command cmake ge 3.14
-    regist_dependency required command ninja:make:gmake
-    regist_dependency required command go
-    regist_dependency required command tar
-    regist_dependency required command gzip
+    regist_dependency required exe git
+    regist_dependency required exe python3:python3.9:python3.8:python3.7:python3.6:python ge 3.6.0
+    regist_dependency required exe clang
+    regist_dependency required exe clang++
+    regist_dependency required exe cmake ge 3.14
+    regist_dependency required exe ninja:make:gmake
+    regist_dependency required exe go
+    regist_dependency required exe tar
+    regist_dependency required exe gzip
 
     step "handle required tools"
     __handle_required_dependencies
     __printf_required_dependencies
     __printf_optional_dependencies
 
-    BASH=$(command -v bash || command -v zsh)
     PYTHON=$(command -v python3 || command -v python3.9 || command -v python3.8 || command -v python3.7 || command -v python3.6 || command -v python3.5 || command -v python)
 
     command -v npm  > /dev/null || {
         command -v nvm > /dev/null || {
-	    step "install nvm"
-	    run "curl -o- $(github_user_content_base_url)/nvm-sh/nvm/master/install.sh | $BASH"
-	    export NVM_DIR="${HOME}/.nvm"
-	    . ~/.nvm/nvm.sh
-	}
+            step "install nvm"
+            handle_dependency required exe nvm
+	    }
     	step "install node.js v16.9.0"
+        unset PREFIX
     	run nvm install v16.9.0
     }
 
@@ -2426,7 +2433,7 @@ EOF
     export GOPATH=$YCM_INSTALL_DIR/go
     export GO111MODULE=on
     if [ "$CHINA" = true ] ; then
-        export GOPROXY=https://goproxy.io
+        export GOPROXY='https://goproxy.io'
     fi
 
     if [ "$CHINA" = true ] ; then
@@ -2441,6 +2448,11 @@ EOF
     run cd "$YCM_INSTALL_DIR"
 
     if [ "$CHINA" = true ] ; then
+        if [ "$NATIVE_OS_SUBS" = termux ] && [ -f third_party/ycmd/cpp/ycm/CMakeLists.txt ] ; then
+            sed_in_place 's@dl.bintray.com/micbou/libclang@github.com/ycm-core/llvm/releases/download/\${CLANG_VERSION}@g' third_party/ycmd/cpp/ycm/CMakeLists.txt
+            sed_in_place '/SHOW_PROGRESS/c SHOW_PROGRESS' third_party/ycmd/cpp/ycm/CMakeLists.txt
+            sed_in_place 's/CLANG_VERSION 8/CLANG_VERSION 12/' third_party/ycmd/cpp/ycm/CMakeLists.txt
+        fi
         if [ -d third_party/python-future/docs/notebooks/ ] ; then
             run rm -rf third_party/python-future/docs/notebooks/
         fi
@@ -2451,15 +2463,19 @@ EOF
         sed_in_place "s@download.eclipse.org@mirrors.ustc.edu.cn/eclipse@g" ./third_party/ycmd/build.py
     fi
 
-    YCM_INSTALL_ARGS="--clang-completer --system-libclang --ts-completer --go-completer"
+    YCM_INSTALL_ARGS="--clang-completer --ts-completer --go-completer"
 
     command -v java > /dev/null && {
         YCM_INSTALL_ARGS="$YCM_INSTALL_ARGS --java-completer"
     }
 
     command -v ninja > /dev/null && {
-	YCM_INSTALL_ARGS="$YCM_INSTALL_ARGS --ninja"
+        YCM_INSTALL_ARGS="$YCM_INSTALL_ARGS --ninja"
     }
+
+    if [ "$NATIVE_OS_SUBS" = termux ] ; then
+        YCM_INSTALL_ARGS="$YCM_INSTALL_ARGS --system-libclang"
+    fi
 
     step "compile YouCompleteMe"
     run $PYTHON install.py $YCM_INSTALL_ARGS
