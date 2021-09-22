@@ -548,9 +548,9 @@ fetch() {
                     ;;
                 wget)
                     if [ -z "$FETCH_PIPE_TO_CMD" ] ; then
-                        run wget --timeout=60 -O "$FETCH_OUTPUT_PATH" "'$FETCH_URL'"
+                        run "wget --timeout=60 -O '$FETCH_OUTPUT_PATH' '$FETCH_URL'"
                     else
-                        run "wget --timeout=60 -O '$FETCH_OUTPUT_PATH '$FETCH_URL' | $FETCH_PIPE_TO_CMD"
+                        run "wget --timeout=60 -O '$FETCH_OUTPUT_PATH' '$FETCH_URL' | $FETCH_PIPE_TO_CMD"
                     fi
                     ;;
                 http)
@@ -1963,7 +1963,7 @@ __install_command_via_run_install_script() {
 }
 
 __install_command_via_pip() {
-    [ -z "$(get_package_name_by_command_name_pip3 "$1")" ] && return 1
+    [ -z "$(get_package_name_by_command_name_from_package_manager_pip3 "$1")" ] && return 1
 
     handle_dependency required exe pip3:pip
 
@@ -1979,7 +1979,7 @@ __install_command_via_pip() {
     if   command_exists_in_filesystem pip3 ; then
         __install_package_via_package_manager pip3 "$(get_package_name_by_command_name_from_package_manager_pip3 "$1")"
     elif command_exists_in_filesystem pip ; then
-        __install_package_via_package_manager pip  "$(get_package_name_by_command_name_pip "$1")"
+        __install_package_via_package_manager pip  "$(get_package_name_by_command_name_from_package_manager_pip "$1")"
     else
         return 1
     fi
