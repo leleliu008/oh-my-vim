@@ -1187,10 +1187,10 @@ version_of_package() {
 
 # }}}
 ##############################################################################
-# {{{ get_XX_package_name_by_command_name
+# {{{ get_package_name_by_command_name_from_package_manager_XX
 
 # https://cygwin.com/packages/package_list.html
-get_choco_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_choco() {
     case $1 in
           go) echo 'golang' ;;
       cc|gcc|c++|g++)
@@ -1213,7 +1213,7 @@ get_choco_package_name_by_command_name() {
     esac
 }
 
-get_pkg_add_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_add_pkg() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1247,7 +1247,7 @@ get_pkg_add_package_name_by_command_name() {
     esac
 }
 
-get_pkgin_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_pkgin() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1275,7 +1275,7 @@ get_pkgin_package_name_by_command_name() {
     esac
 }
 
-get_pkg_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_pkg() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1301,7 +1301,7 @@ get_pkg_package_name_by_command_name() {
     esac
 }
 
-get_emerge_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_emerge() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
@@ -1329,7 +1329,7 @@ get_emerge_package_name_by_command_name() {
     esac
 }
 
-__get_pacman_package_name_by_command_name() {
+__get_package_name_by_command_name_from_package_manager_pacman() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
@@ -1372,18 +1372,18 @@ __mingw_w64_x86_64() {
     fi
 }
 
-get_pacman_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_pacman() {
     if [ "$1" = 'make' ] || [ "$1" = 'gmake' ] ; then
         echo make
     fi
     case $NATIVE_OS_TYPE in
-        mingw32) __mingw_w64_i686   $(__get_pacman_package_name_by_command_name "$1") ;;
-        mingw64) __mingw_w64_x86_64 $(__get_pacman_package_name_by_command_name "$1") ;;
-        *) __get_pacman_package_name_by_command_name "$1"
+        mingw32) __mingw_w64_i686   $(__get_package_name_by_command_name_from_package_manager_pacman "$1") ;;
+        mingw64) __mingw_w64_x86_64 $(__get_package_name_by_command_name_from_package_manager_pacman "$1") ;;
+        *) __get_package_name_by_command_name_from_package_manager_pacman "$1"
     esac
 }
 
-get_xbps_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_xbps() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
@@ -1396,7 +1396,6 @@ get_xbps_package_name_by_command_name() {
     realpath) echo 'coreutils';;
       protoc) echo 'protobuf' ;;
       ps2pdf) echo "ghostscript" ;;
-     python3) echo 'python3 python3-dev' ;;
     pip|pip3) echo "python3-pip" ;;
     rst2man|rst2html)
               echo "python3-docutils" ;;
@@ -1410,7 +1409,7 @@ get_xbps_package_name_by_command_name() {
     esac
 }
 
-get_apk_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_apk() {
     case $1 in
       cc|gcc) echo 'gcc libc-dev' ;;
          c++) echo 'g++'   ;;
@@ -1423,7 +1422,6 @@ get_apk_package_name_by_command_name() {
     realpath) echo 'coreutils';;
       protoc) echo 'protobuf' ;;
       ps2pdf) echo "ghostscript" ;;
-     python3) echo 'python3 python3-dev' ;;
     pip3|pip) echo 'py3-pip' ;;
     rst2man|rst2html)
               echo "py3-docutils" ;;
@@ -1439,7 +1437,7 @@ get_apk_package_name_by_command_name() {
     esac
 }
 
-get_zypper_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_zyyper() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'gcc-g++';;
@@ -1467,7 +1465,7 @@ get_zypper_package_name_by_command_name() {
     esac
 }
 
-get_dnf_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_dnf() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1494,7 +1492,7 @@ get_dnf_package_name_by_command_name() {
     esac
 }
 
-get_yum_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_yum() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1518,11 +1516,11 @@ get_yum_package_name_by_command_name() {
     esac
 }
 
-get_apt_get_package_name_by_command_name() {
-    get_apt_package_name_by_command_name $@
+get_package_name_by_command_name_from_package_manager_apt_get() {
+    get_package_name_by_command_name_from_package_manager_apt $@
 }
 
-get_apt_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_apt() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1537,7 +1535,6 @@ get_apt_package_name_by_command_name() {
     realpath) echo 'coreutils';;
       protoc) echo 'protobuf' ;;
       ps2pdf) echo "ghostscript" ;;
-     python3) echo 'python3 python3-dev' ;;
     pip3|pip) echo "python3-pip" ;;
     rst2man|rst2html)
               echo "python3-docutils" ;;
@@ -1552,7 +1549,7 @@ get_apt_package_name_by_command_name() {
     esac
 }
 
-get_brew_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_brew() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
@@ -1580,11 +1577,11 @@ get_brew_package_name_by_command_name() {
     esac
 }
 
-get_pip3_package_name_by_command_name() {
-    get_pip_package_name_by_command_name $@
+get_package_name_by_command_name_from_package_manager_pip3() {
+    get_package_name_by_command_name_from_package_manager_pip $@
 }
 
-get_pip_package_name_by_command_name() {
+get_package_name_by_command_name_from_package_manager_pip() {
     case $1 in
         sphinx-build) echo "sphinx"   ;;
         rst2man.py)   echo "docutils" ;;
@@ -1696,7 +1693,7 @@ __install_package_via_package_manager() {
 # __install_command_via_package_manager apt make
 __install_command_via_package_manager() {
     unset __PACKAGE_NAME__
-    __PACKAGE_NAME__="$(eval get_$(echo "$1" | tr - _)_package_name_by_command_name $2)"
+    __PACKAGE_NAME__="$(eval get_package_name_by_command_name_from_package_manager_$(echo "$1" | tr - _) $2)"
 
     [ -z "$__PACKAGE_NAME__" ] && return 1
 
@@ -2396,6 +2393,18 @@ EOF
     __printf_required_dependencies
     __printf_optional_dependencies
 
+    if [ -z "$AVAILABLE_PACKAGE_MANAGER_LIST" ] ; then
+        AVAILABLE_PACKAGE_MANAGER_LIST=$(__get_available_package_manager_list)
+    fi
+    for pm in $AVAILABLE_PACKAGE_MANAGER_LIST
+    do
+        case $pm in
+            apt|apt-get|apk|xbps)
+               __install_package_via_package_manager "$pm" python3-dev && break
+               ;;
+        esac
+    done
+
     PYTHON=$(command -v python3 || command -v python3.9 || command -v python3.8 || command -v python3.7 || command -v python3.6 || command -v python3.5 || command -v python)
 
     command -v npm  > /dev/null || {
@@ -2438,9 +2447,9 @@ EOF
 
     if [ "$CHINA" = true ] ; then
         #YCM_URL=https://gitee.com/tbang/YouCompleteMe.git
-        YCM_URL=https://gitee.com/YouCompleteMe/YouCompleteMe.git
+        YCM_URL='https://gitee.com/YouCompleteMe/YouCompleteMe.git'
     else
-        YCM_URL=https://github.com/ycm-core/YouCompleteMe.git
+        YCM_URL='https://github.com/ycm-core/YouCompleteMe.git'
     fi
 
     run git clone --recursive "$YCM_URL" "$YCM_INSTALL_DIR"
