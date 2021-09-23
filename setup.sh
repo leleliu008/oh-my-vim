@@ -1265,17 +1265,17 @@ command_exists_in_filesystem_and_version_matched() {
 # le  less than or equal
 #
 # examples:
-# package_exists_and_version_matched apt automake eq 1.16.0
-# package_exists_and_version_matched apt automake lt 1.16.0
-# package_exists_and_version_matched apt automake gt 1.16.0
-# package_exists_and_version_matched apt automake le 1.16.0
-# package_exists_and_version_matched apt automake ge 1.16.0
-# package_exists_and_version_matched apt automake
-package_exists_in_repo_and_version_matched() {
-    if package_exists_in_repo "$1" "$2" ; then
+# is_package_available_and_version_matched_in_package_manager apt automake eq 1.16.0
+# is_package_available_and_version_matched_in_package_manager apt automake lt 1.16.0
+# is_package_available_and_version_matched_in_package_manager apt automake gt 1.16.0
+# is_package_available_and_version_matched_in_package_manager apt automake le 1.16.0
+# is_package_available_and_version_matched_in_package_manager apt automake ge 1.16.0
+# is_package_available_and_version_matched_in_package_manager apt automake
+is_package_available_and_version_matched_in_package_manager() {
+    if is_package_available_in_package_manager "$1" "$2" ; then
         if [ $# -eq 4 ] ; then
             case $1 in
-                apt|yum|dnf) version_match "$(version_of_package "$1" "$2")" "$3" "$4" ;;
+                pkg|apt|apk|yum|dnf) version_match "$(get_package_version_by_package_name_in_package_manager "$1" "$2")" "$3" "$4" ;;
                 *)       return 0 ;;
             esac
         fi
@@ -1284,25 +1284,29 @@ package_exists_in_repo_and_version_matched() {
     fi
 }
 
-# check if the give package is in the give repo
+# check if the given package is in the given package manager's repo
 #
 # examples:
-# package_exists_in_repo apt automake
-package_exists_in_repo() {
+# is_package_available_in_package_manager apt automake
+is_package_available_in_package_manager() {
     case $1 in
+        pkg) pkg show "$2" > /dev/null 2>&1 ;;
         apt) apt show "$2" > /dev/null 2>&1 ;;
+        apk) apk info "$2" > /dev/null 2>&1 ;;
         yum) yum info "$2" > /dev/null 2>&1 ;;
         dnf) dnf info "$2" > /dev/null 2>&1 ;;
     esac
 }
 
-# get the version of the give package in the give repo
+# get the version of the give package in the give package manager's repo
 #
 # examples:
-# version_of_package apt automake
-version_of_package() {
+# get_package_version_by_package_name_in_package_manager apt automake
+get_package_version_by_package_name_in_package_manager() {
     case $1 in
+        pkg) pkg show "$2" 2> /dev/null | grep 'Version: '      | head -n 1 | cut -d ' ' -f2 | cut -d- -f1 ;;
         apt) apt show "$2" 2> /dev/null | grep 'Version: '      | head -n 1 | cut -d ' ' -f2 | cut -d- -f1 ;;
+        apk) apk info "$2" 2> /dev/null | head -n 1 | cut -d ' ' -f1 | cut -d- -f2 ;;
         yum) yum info "$2" 2> /dev/null | grep 'Version     :'  | head -n 1 | cut -d : -f2 | sed 's/^[[:space:]]//' ;;
         dnf) dnf info "$2" 2> /dev/null | grep 'Version      :' | head -n 1 | cut -d : -f2 | sed 's/^[[:space:]]//' ;;
     esac
@@ -1310,10 +1314,10 @@ version_of_package() {
 
 # }}}
 ##############################################################################
-# {{{ get_package_name_by_command_name_from_package_manager_XX
+# {{{ get_package_name_by_command_name_in_package_manager_XX
 
 # https://cygwin.com/packages/package_list.html
-get_package_name_by_command_name_from_package_manager_choco() {
+get_package_name_by_command_name_in_package_manager_choco() {
     case $1 in
           go) echo 'golang' ;;
       cc|gcc|c++|g++)
@@ -1336,7 +1340,7 @@ get_package_name_by_command_name_from_package_manager_choco() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_add_pkg() {
+get_package_name_by_command_name_in_package_manager_add_pkg() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1370,7 +1374,7 @@ get_package_name_by_command_name_from_package_manager_add_pkg() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_pkgin() {
+get_package_name_by_command_name_in_package_manager_pkgin() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1398,7 +1402,7 @@ get_package_name_by_command_name_from_package_manager_pkgin() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_pkg() {
+get_package_name_by_command_name_in_package_manager_pkg() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1424,7 +1428,7 @@ get_package_name_by_command_name_from_package_manager_pkg() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_emerge() {
+get_package_name_by_command_name_in_package_manager_emerge() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
@@ -1452,7 +1456,7 @@ get_package_name_by_command_name_from_package_manager_emerge() {
     esac
 }
 
-__get_package_name_by_command_name_from_package_manager_pacman() {
+__get_package_name_by_command_name_in_package_manager_pacman() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
@@ -1495,18 +1499,18 @@ __mingw_w64_x86_64() {
     fi
 }
 
-get_package_name_by_command_name_from_package_manager_pacman() {
+get_package_name_by_command_name_in_package_manager_pacman() {
     if [ "$1" = 'make' ] || [ "$1" = 'gmake' ] ; then
         echo make
     fi
     case $NATIVE_OS_TYPE in
-        mingw32) __mingw_w64_i686   $(__get_package_name_by_command_name_from_package_manager_pacman "$1") ;;
-        mingw64) __mingw_w64_x86_64 $(__get_package_name_by_command_name_from_package_manager_pacman "$1") ;;
-        *) __get_package_name_by_command_name_from_package_manager_pacman "$1"
+        mingw32) __mingw_w64_i686   $(__get_package_name_by_command_name_in_package_manager_pacman "$1") ;;
+        mingw64) __mingw_w64_x86_64 $(__get_package_name_by_command_name_in_package_manager_pacman "$1") ;;
+        *) __get_package_name_by_command_name_in_package_manager_pacman "$1"
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_xbps() {
+get_package_name_by_command_name_in_package_manager_xbps() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
@@ -1532,7 +1536,7 @@ get_package_name_by_command_name_from_package_manager_xbps() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_apk() {
+get_package_name_by_command_name_in_package_manager_apk() {
     case $1 in
       cc|gcc) echo 'gcc libc-dev' ;;
          c++) echo 'g++'   ;;
@@ -1560,7 +1564,7 @@ get_package_name_by_command_name_from_package_manager_apk() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_zypper() {
+get_package_name_by_command_name_in_package_manager_zypper() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'gcc-g++';;
@@ -1588,7 +1592,7 @@ get_package_name_by_command_name_from_package_manager_zypper() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_dnf() {
+get_package_name_by_command_name_in_package_manager_dnf() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1615,7 +1619,7 @@ get_package_name_by_command_name_from_package_manager_dnf() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_yum() {
+get_package_name_by_command_name_in_package_manager_yum() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1639,11 +1643,11 @@ get_package_name_by_command_name_from_package_manager_yum() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_apt_get() {
-    get_package_name_by_command_name_from_package_manager_apt $@
+get_package_name_by_command_name_in_package_manager_apt_get() {
+    get_package_name_by_command_name_in_package_manager_apt $@
 }
 
-get_package_name_by_command_name_from_package_manager_apt() {
+get_package_name_by_command_name_in_package_manager_apt() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -1672,7 +1676,7 @@ get_package_name_by_command_name_from_package_manager_apt() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_brew() {
+get_package_name_by_command_name_in_package_manager_brew() {
     case $1 in
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
@@ -1700,11 +1704,11 @@ get_package_name_by_command_name_from_package_manager_brew() {
     esac
 }
 
-get_package_name_by_command_name_from_package_manager_pip3() {
-    get_package_name_by_command_name_from_package_manager_pip $@
+get_package_name_by_command_name_in_package_manager_pip3() {
+    get_package_name_by_command_name_in_package_manager_pip $@
 }
 
-get_package_name_by_command_name_from_package_manager_pip() {
+get_package_name_by_command_name_in_package_manager_pip() {
     case $1 in
         sphinx-build) echo "sphinx"   ;;
         rst2man.py)   echo "docutils" ;;
@@ -1768,7 +1772,7 @@ __install_package_via_package_manager() {
         return 1
     fi
 
-    package_exists_in_repo_and_version_matched $@ || return 1
+    is_package_available_and_version_matched_in_package_manager $@ || return 1
 
     case $1 in
         pip3)
@@ -1818,13 +1822,13 @@ __install_package_via_package_manager() {
 # __install_command_via_package_manager apt make
 __install_command_via_package_manager() {
     unset __PACKAGE_NAME__
-    __PACKAGE_NAME__="$(eval get_package_name_by_command_name_from_package_manager_$(echo "$1" | tr - _) $2)"
+    __PACKAGE_NAME__="$(eval get_package_name_by_command_name_in_package_manager_$(echo "$1" | tr - _) $2)"
 
     if [ -z "$__PACKAGE_NAME__" ] ; then
         return 1
     fi
 
-    package_exists_in_repo_and_version_matched "$1" "$__PACKAGE_NAME__" $3 $4 || return 1
+    is_package_available_and_version_matched_in_package_manager "$1" "$__PACKAGE_NAME__" $3 $4 || return 1
 
     print "🔥  ${COLOR_GREEN}$(shiftn 1 $@)${COLOR_OFF} ${COLOR_YELLOW}command is required, but it is not found, I will install it via${COLOR_OFF} ${COLOR_GREEN}$1${COLOR_OFF}\n"
 
@@ -2068,7 +2072,7 @@ __install_command_via_run_install_script() {
 }
 
 __install_command_via_pip() {
-    if [ -z "$(get_package_name_by_command_name_from_package_manager_pip3 "$1")" ] ; then
+    if [ -z "$(get_package_name_by_command_name_in_package_manager_pip3 "$1")" ] ; then
         return 1
     fi
 
@@ -2084,9 +2088,9 @@ __install_command_via_pip() {
     )
 
     if   command_exists_in_filesystem pip3 ; then
-        __install_package_via_package_manager pip3 "$(get_package_name_by_command_name_from_package_manager_pip3 "$1")"
+        __install_package_via_package_manager pip3 "$(get_package_name_by_command_name_in_package_manager_pip3 "$1")"
     elif command_exists_in_filesystem pip ; then
-        __install_package_via_package_manager pip  "$(get_package_name_by_command_name_from_package_manager_pip "$1")"
+        __install_package_via_package_manager pip  "$(get_package_name_by_command_name_in_package_manager_pip "$1")"
     else
         return 1
     fi
