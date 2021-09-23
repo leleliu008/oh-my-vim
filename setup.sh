@@ -52,7 +52,15 @@ die() {
 # check if file exists
 # $1 FILEPATH
 file_exists() {
-    [ -n "$1" ] && [ -e "$1" ]
+    if [ -z "$1" ] ; then
+        die "file_exists() please specify a filepath."
+    else
+        if [ -e "$1" ] ; then
+            return 0
+        else
+            warn "file_exists() file not exist: $1"
+        fi
+    fi
 }
 
 # check if command exists in filesystem
@@ -65,7 +73,15 @@ command_exists_in_filesystem() {
 }
 
 executable() {
-    file_exists "$1" && [ -x "$1" ]
+    if file_exists "$1" ; then
+        if [ -x "$1" ] ; then
+            return 0
+        else
+            return 1
+        fi
+    else
+        return 1
+    fi
 }
 
 die_if_file_is_not_exist() {
@@ -288,7 +304,10 @@ sha256sum() {
 # $2 expect sha256sum
 file_exists_and_sha256sum_matched() {
     die_if_file_is_not_exist "$1"
-    [ -z "$2" ] && die "please specify expected sha256sum."
+    if [ -z "$2" ] ; then
+        die "please specify expected sha256sum."
+    fi
+
     [ "$(sha256sum $1)" = "$2" ]
 }
 
@@ -320,8 +339,11 @@ map_contains() {
     die_if_map_key__is_not_specified "$2"
     for item in $(eval echo \$$(__map_name_ref "$1"))
     do
-        [ "$item" = "$2" ] && return 0
+        if [ "$item" = "$2" ] ; then
+            return 0
+        fi
     done
+    return 1
 }
 
 # $1 map_name
@@ -475,8 +497,12 @@ fetch() {
         if [ -z "$FETCH_OUTPUT_DIR" ] && [ -z "$FETCH_OUTPUT_NAME" ] ; then
             FETCH_OUTPUT_PATH='-'
         else
-            [ -z "$FETCH_OUTPUT_DIR" ]  && FETCH_OUTPUT_DIR="$PWD"
-            [ -z "$FETCH_OUTPUT_NAME" ] && FETCH_OUTPUT_NAME=$(basename "$FETCH_URL")
+            if [ -z "$FETCH_OUTPUT_DIR" ] ; then
+                FETCH_OUTPUT_DIR="$PWD"
+            fi
+            if [ -z "$FETCH_OUTPUT_NAME" ] ; then
+                FETCH_OUTPUT_NAME=$(basename "$FETCH_URL")
+            fi
             FETCH_OUTPUT_PATH="$FETCH_OUTPUT_DIR/$FETCH_OUTPUT_NAME"
             if [ ! -d "$FETCH_OUTPUT_DIR" ] ; then
                 run install -d "$FETCH_OUTPUT_DIR"
@@ -533,10 +559,10 @@ fetch() {
                 fi
             done
 
-            [ -z "$FETCH_TOOL" ] && {
+            if [ -z "$FETCH_TOOL" ] ; then
                 handle_dependency required exe curl
                 FETCH_TOOL=curl
-            }
+            fi
 
             case $FETCH_TOOL in
                 curl)
@@ -595,11 +621,56 @@ fetch() {
 
 # }}}
 ##############################################################################
+# {{{ get_china_mirror_url
+
+contains_china_argument() {
+    for arg in $@
+    do
+        case $arg in
+            --china) return 0
+        esac
+    done
+    return 1
+}
+
+# get_china_mirror_url <ORIGIN_URL> [--china]
+get_china_mirror_url() {
+    if [ -z "$1" ] ; then
+        die "get_china_mirror_url() please specify a url."
+    fi
+
+    if contains_china_argument $@ ; then
+        case $1 in
+            *githubusercontent.com*)
+                printf "%s" "$1" | sed 's@githubusercontent.com@githubusercontents.com@'
+                ;;
+            *github.com*)
+                printf "%s" "$1" | sed 's@github.com@github.com.cnpm.org@'
+                ;;
+        esac
+    else
+        printf "%s" "$1"
+    fi
+}
+
+# }}}
+##############################################################################
 # {{{ __upgrade_self
 
-# __upgrade_self <UPGRAGE_URL>
+# __upgrade_self <UPGRAGE_URL> [-x | --china]
 __upgrade_self() {
     set -e
+
+    if [ -z "$1" ] ; then
+        die "__upgrade_self() please specify a url."
+    fi
+
+    for arg in $@
+    do
+        case $arg in
+            -x) set -x ;;
+        esac
+    done
 
     unset CURRENT_SCRIPT_REALPATH
 
@@ -623,13 +694,13 @@ __upgrade_self() {
 
     run cd $WORKING_DIR
 
-    fetch "$1" --output-path="$WORKING_DIR/self"
+    fetch "$(get_china_mirror_url $@)" --output-path="$WORKING_DIR/self"
 
     __upgrade_self_exit() {
         if [ -w "$CURRENT_SCRIPT_REALPATH" ] ; then
-            run      install -m 555 self "$CURRENT_SCRIPT_REALPATH"
+            run      install -m 755 self "$CURRENT_SCRIPT_REALPATH"
         else
-            run sudo install -m 555 self "$CURRENT_SCRIPT_REALPATH"
+            run sudo install -m 755 self "$CURRENT_SCRIPT_REALPATH"
         fi
 
         run rm -rf $WORKING_DIR
@@ -642,23 +713,27 @@ __upgrade_self() {
 ##############################################################################
 # {{{ __integrate_zsh_completions
 
-# __integrate_zsh_completions <ZSH_COMPLETIONS_SCRIPT_URL>
+# __integrate_zsh_completions <ZSH_COMPLETIONS_SCRIPT_URL> [-x | --china]
 __integrate_zsh_completions() {
     set -e
 
+    if [ -z "$1" ] ; then
+        die "__integrate_zsh_completions() please specify a url."
+    fi
+
+    for arg in $@
+    do
+        case $arg in
+            -x) set -x ;;
+        esac
+    done
+
     ZSH_COMPLETIONS_SCRIPT_FILENAME="_$CURRENT_SCRIPT_FILENAME"
-    ZSH_COMPLETIONS_SCRIPT_OUT_DIR='/usr/local/share/zsh/site-functions'
-    ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH="$ZSH_COMPLETIONS_SCRIPT_OUT_DIR/$ZSH_COMPLETIONS_SCRIPT_FILENAME"
 
-    info "mktemp -d"
-    WORKING_DIR=$(mktemp -d)
-
-    run cd $WORKING_DIR
-
-    fetch "$1" --output-path="$WORKING_DIR/$ZSH_COMPLETIONS_SCRIPT_FILENAME"
-
-    if [ ! -d "$ZSH_COMPLETIONS_SCRIPT_OUT_DIR" ] ; then
-        run install -d "$ZSH_COMPLETIONS_SCRIPT_OUT_DIR"
+    if [ "$(uname)" = Linux ] && command -v termux-info > /dev/null && [ "$HOME" = '/data/data/com.termux/files/home' ] ; then
+        ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH="/data/data/com.termux/files/usr/share/zsh/site-functions/$ZSH_COMPLETIONS_SCRIPT_FILENAME"
+    else
+        ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH="/usr/local/share/zsh/site-functions/$ZSH_COMPLETIONS_SCRIPT_FILENAME"
     fi
 
     # if file exists and is a symbolic link
@@ -674,16 +749,30 @@ __integrate_zsh_completions() {
         fi
     fi
 
-    if [ -w "$ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH" ] ; then
-        run      install -m 644 "$ZSH_COMPLETIONS_SCRIPT_FILENAME" "$ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH"
+    info "mktemp -d"
+    WORKING_DIR=$(mktemp -d)
+
+    run cd $WORKING_DIR
+
+    fetch "$(get_china_mirror_url $@)" --output-path="$WORKING_DIR/$ZSH_COMPLETIONS_SCRIPT_FILENAME"
+
+    if [ -f "$ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH" ] ; then
+        if [ -w "$ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH" ] ; then
+            run      install -m 644 "$ZSH_COMPLETIONS_SCRIPT_FILENAME" "$ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH"
+        else
+            run sudo install -m 644 "$ZSH_COMPLETIONS_SCRIPT_FILENAME" "$ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH"
+        fi
     else
-        run sudo install -m 644 "$ZSH_COMPLETIONS_SCRIPT_FILENAME" "$ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH"
+        ZSH_COMPLETIONS_SCRIPT_OUT_DIR="$(dirname "$ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH")"
+        if [ ! -d "$ZSH_COMPLETIONS_SCRIPT_OUT_DIR" ] ; then
+            run install -d "$ZSH_COMPLETIONS_SCRIPT_OUT_DIR"
+        fi
+        run install -m 644 "$ZSH_COMPLETIONS_SCRIPT_FILENAME" "$ZSH_COMPLETIONS_SCRIPT_OUT_FILEPATH"
     fi
 
     run rm -rf $WORKING_DIR
 
-    echo
-    warn "you need to run command ${COLOR_GREEN}autoload -U compinit && compinit${COLOR_OFF} ${COLOR_YELLOW}in zsh to make it work.${COLOR_OFF}"
+    echo "\n${COLOR_YELLOW}Note: you need to run command${COLOR_RED} ${COLOR_GREEN}autoload -U compinit && compinit${COLOR_OFF} ${COLOR_YELLOW}in zsh to make it work.${COLOR_OFF}"
 }
 
 # }}}
@@ -1102,19 +1191,27 @@ version_match() {
         eq)  [ "$1"  = "$3" ] ;;
         ne)  [ "$1" != "$3" ] ;;
         le)
-            [ "$1" = "$3" ] && return 0
+            if [ "$1" = "$3" ] ; then
+                return 0
+            fi
             [ "$1" = "$(version_sort "$1" "$3" | head -n 1)" ]
             ;;
         ge)
-            [ "$1" = "$3" ] && return 0
+            if [ "$1" = "$3" ] ; then
+                return 0
+            fi
             [ "$1" = "$(version_sort "$1" "$3" | tail -n 1)" ]
             ;;
         lt)
-            [ "$1" = "$3" ] && return 1
+            if [ "$1" = "$3" ] ; then
+                return 1
+            fi
             [ "$1" = "$(version_sort "$1" "$3" | head -n 1)" ]
             ;;
         gt)
-            [ "$1" = "$3" ] && return 1
+            if [ "$1" = "$3" ] ; then
+                return 1
+            fi
             [ "$1" = "$(version_sort "$1" "$3" | tail -n 1)" ]
             ;;
         *)  die "version_compare: $2: not supported operator."
@@ -1667,7 +1764,9 @@ __get_available_package_manager_list() {
 # __install_package_via_package_manager apt make ge 3.80
 # __install_package_via_package_manager apt make
 __install_package_via_package_manager() {
-    [ -z "$2" ] && return 1
+    if [ -z "$2" ] ; then
+        return 1
+    fi
 
     package_exists_in_repo_and_version_matched $@ || return 1
 
@@ -1721,7 +1820,9 @@ __install_command_via_package_manager() {
     unset __PACKAGE_NAME__
     __PACKAGE_NAME__="$(eval get_package_name_by_command_name_from_package_manager_$(echo "$1" | tr - _) $2)"
 
-    [ -z "$__PACKAGE_NAME__" ] && return 1
+    if [ -z "$__PACKAGE_NAME__" ] ; then
+        return 1
+    fi
 
     package_exists_in_repo_and_version_matched "$1" "$__PACKAGE_NAME__" $3 $4 || return 1
 
@@ -1734,7 +1835,9 @@ __install_command_via_package_manager() {
 # __install_command_via_available_package_manager python3 ge 3.5
 # __install_command_via_available_package_manager make
 __install_command_via_available_package_manager() {
-    command_exists_in_filesystem_and_version_matched $@ && return 0
+    if command_exists_in_filesystem_and_version_matched $@ ; then
+        return 0
+    fi
  
     if [ -z "$AVAILABLE_PACKAGE_MANAGER_LIST" ] ; then
         AVAILABLE_PACKAGE_MANAGER_LIST=$(__get_available_package_manager_list)
@@ -1747,7 +1850,9 @@ __install_command_via_available_package_manager() {
     fi
     for pm in $AVAILABLE_PACKAGE_MANAGER_LIST
     do
-        __install_command_via_package_manager "$pm" $@ && return 0
+        if __install_command_via_package_manager "$pm" $@ ; then
+            return 0
+        fi
     done
     return 1
 }
@@ -1963,7 +2068,9 @@ __install_command_via_run_install_script() {
 }
 
 __install_command_via_pip() {
-    [ -z "$(get_package_name_by_command_name_from_package_manager_pip3 "$1")" ] && return 1
+    if [ -z "$(get_package_name_by_command_name_from_package_manager_pip3 "$1")" ] ; then
+        return 1
+    fi
 
     handle_dependency required exe pip3:pip
 
@@ -1989,12 +2096,26 @@ __install_command_via_pip() {
 # __install_command python3 ge 3.5
 # __install_command make
 __install_command() {
-    command_exists_in_filesystem_and_version_matched $@ && return 0
+    if command_exists_in_filesystem_and_version_matched $@ ; then
+        return 0
+    fi
 
-    __install_command_via_run_install_script $@         && return 0
-    __install_command_via_pip $@                        && return 0
-    __install_command_via_available_package_manager $@  && return 0
-    __install_command_via_fetch_prebuild_binary $@      && return 0
+    if __install_command_via_run_install_script $@ ; then
+        return 0
+    fi
+
+    if __install_command_via_pip $@ ; then
+        return 0
+    fi
+
+    if __install_command_via_available_package_manager $@ ; then
+        return 0
+    fi
+
+    if __install_command_via_fetch_prebuild_binary $@ ; then
+        return 0
+    fi
+
     return 1
 }
 
@@ -2175,7 +2296,9 @@ python_module() {
             esac
             ;;
         install)
-            [ -z "$2" ] && die "please specify a python module name."
+            if [ -z "$2" ] ; then
+                die "please specify a python module name."
+            fi
             if ! python_module is installed "$2" ; then
                 print "🔥  ${COLOR_GREEN}$2${COLOR_OFF} ${COLOR_YELLOW}python module is required, but it is not found, I will install it via${COLOR_OFF} ${COLOR_GREEN}$__PIP_COMMAND__${COLOR_OFF}\n"
                 run "$__PIP_COMMAND__" install -U pip  || return 1
@@ -2318,7 +2441,7 @@ EOF
             return 0
             ;;
         upgrade-self)
-            __upgrade_self 'https://raw.githubusercontent.com/leleliu008/oh-my-vim/master/install.sh'
+            __upgrade_self 'https://raw.githubusercontent.com/leleliu008/oh-my-vim/master/setup.sh'
             return 0
             ;;
     esac
