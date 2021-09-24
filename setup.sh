@@ -624,9 +624,9 @@ install_ca_certificates_on_netbsd() {
     if [ "$(uname)" = NetBSD ] ; then
         if command -v pkgin > /dev/null ; then
             if [ "$(whoami)" = root ] ; then
-                run      pkgin install mozilla-rootcerts || return 1
+                run      pkgin -y install mozilla-rootcerts || return 1
             else
-                run sudo pkgin install mozilla-rootcerts || return 1
+                run sudo pkgin -y install mozilla-rootcerts || return 1
             fi
             run mozilla-rootcerts install
         fi
@@ -2443,7 +2443,7 @@ regist_dependency() {
 # {{{ main
 
 main() {
-    set -e
+    set -ex
 
     case $1 in
         -h|--help)
