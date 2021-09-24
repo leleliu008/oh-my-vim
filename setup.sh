@@ -619,6 +619,20 @@ fetch() {
     esac
 }
 
+install_ca_certificates_on_netbsd() {
+    # https://www.cambus.net/installing-ca-certificates-on-netbsd/
+    if [ "$(uname)" = NetBSD ] ; then
+        if command -v pkgin > /dev/null ; then
+            if [ "$(whoami)" = root ] ; then
+                run      pkgin install mozilla-rootcerts || return 1
+            else
+                run sudo pkgin install mozilla-rootcerts || return 1
+            fi
+            run mozilla-rootcerts install
+        fi
+    fi
+}
+
 # }}}
 ##############################################################################
 # {{{ get_china_mirror_url
@@ -1376,7 +1390,6 @@ get_package_name_by_command_name_in_package_manager_add_pkg() {
 
 get_package_name_by_command_name_in_package_manager_pkgin() {
     case $1 in
-          go) echo 'golang';;
           cc) echo 'gcc'   ;;
          c++) echo 'g++'   ;;
      clang++) echo 'clang' ;;
@@ -1672,6 +1685,12 @@ get_package_name_by_command_name_in_package_manager_apt() {
     autoreconf) echo "autoconf" ;;
     autoheader) echo "automake" ;;
     autopoint)  echo "gettext"  ;;
+        ninja)
+            if [ "$NATIVE_OS_SUBS" = termux ] ; then
+                echo ninja
+            else
+                echo ninja-build
+            fi
         *)      echo "$1"
     esac
 }
@@ -2496,6 +2515,7 @@ EOF
     fi
 
     step "handle essential tools"
+    install_ca_certificates_on_netbsd
     regist_dependency required exe gsed:sed
     regist_dependency required exe grep
     for dependency in $REQUIRED_DEPENDENCY_LIST
