@@ -1691,6 +1691,7 @@ get_package_name_by_command_name_in_package_manager_apt() {
             else
                 echo ninja-build
             fi
+            ;;
         *)      echo "$1"
     esac
 }
