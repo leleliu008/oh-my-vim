@@ -1354,7 +1354,7 @@ get_package_name_by_command_name_in_package_manager_choco() {
     esac
 }
 
-get_package_name_by_command_name_in_package_manager_add_pkg() {
+get_package_name_by_command_name_in_package_manager_pkg_add() {
     case $1 in
           go) echo 'golang';;
           cc) echo 'gcc'   ;;
@@ -2025,7 +2025,7 @@ cmake     |     |darwin|      |https://github.com/Kitware/CMake/releases/downloa
 EOF
 } | while read LINE
     do
-        LINE=$(echo "$LINE" | sed 's/[[:space:]]//g')
+        LINE=$(printf '%s' "$LINE" | sed 's/[[:space:]]//g')
 
         unset __PB_COMMAND__
         unset __PB_OS_LIBC__
@@ -2033,31 +2033,31 @@ EOF
         unset __PB_OS_ARCH__
         unset __PB_URL__
 
-        __PB_COMMAND__=$(echo "$LINE" | cut -d '|' -f1)
+        __PB_COMMAND__=$(printf '%s' "$LINE" | cut -d '|' -f1)
 
         if [ "$__PB_COMMAND__" != "$1" ] ; then
             continue
         fi
 
-        __PB_OS_LIBC__=$(echo "$LINE" | cut -d '|' -f2)
+        __PB_OS_LIBC__=$(printf '%s' "$LINE" | cut -d '|' -f2)
 
         if [ -n "$__PB_OS_LIBC__" ] && [ "$__PB_OS_LIBC__" != "$NATIVE_OS_LIBC" ] ; then
             continue
         fi
 
-        __PB_OS_TYPE__=$(echo "$LINE" | cut -d '|' -f3)
+        __PB_OS_TYPE__=$(printf '%s' "$LINE" | cut -d '|' -f3)
 
         if [ "$__PB_OS_TYPE__" != "$NATIVE_OS_TYPE" ] ; then
             continue
         fi
 
-        __PB_OS_ARCH__=$(echo "$LINE" | cut -d '|' -f4)
+        __PB_OS_ARCH__=$(printf '%s' "$LINE" | cut -d '|' -f4)
 
         if [ -n "$__PB_OS_ARCH__" ] && [ "$__PB_OS_ARCH__" != "$NATIVE_OS_ARCH" ] ; then
             continue
         fi
 
-        __PB_URL__=$(echo "$LINE" | cut -d '|' -f5)
+        __PB_URL__=$(printf '%s' "$LINE" | cut -d '|' -f5)
 
         echo "$__PB_URL__"
     done
@@ -2085,7 +2085,7 @@ __install_command_via_run_install_script() {
 	        fetch "$(github_user_content_base_url)/nvm-sh/nvm/master/install.sh" --pipe="$(command -v bash || command -v zsh || echo bash)"
 
 	        export NVM_DIR="${HOME}/.nvm"
-	        . "${HOME}/.nvm/nvm.sh"
+	        . "${HOME}/.nvm/nvm.sh" || true
             ;;
         *)  return 1
     esac
@@ -2140,6 +2140,7 @@ __install_command() {
         return 0
     fi
 
+    print "🔥  ${COLOR_GREEN}$@${COLOR_OFF} ${COLOR_YELLOW}command is required, but I found no way to install it.${COLOR_OFF}\n"
     return 1
 }
 
