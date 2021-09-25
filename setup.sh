@@ -469,25 +469,25 @@ fetch() {
             --output-dir=*)
                 FETCH_OUTPUT_DIR=$(getvalue "$1")
                 if [ -z "$FETCH_OUTPUT_DIR" ] ; then
-                    die "fetch() --output-dir argument's value must be not empty."
+                    die "fetch() --output-dir argument's value must not be empty."
                 fi
                 ;;
             --output-name=*)
                 FETCH_OUTPUT_NAME=$(getvalue "$1")
                 if [ -z "$FETCH_OUTPUT_NAME" ] ; then
-                    die "fetch() --output-name argument's value must be not empty."
+                    die "fetch() --output-name argument's value must not be empty."
                 fi
                 ;;
             --output-path=*)
                 FETCH_OUTPUT_PATH=$(getvalue "$1")
                 if [ -z "$FETCH_OUTPUT_PATH" ] ; then
-                    die "fetch() --output-path argument's value must be not empty."
+                    die "fetch() --output-path argument's value must not be empty."
                 fi
                 ;;
             --pipe=*)
                 FETCH_PIPE_TO_CMD=$(getvalue "$1")
                 if [ -z "$FETCH_PIPE_TO_CMD" ] ; then
-                    die "fetch() --pipe=CMD argument's value must be not empty."
+                    die "fetch() --pipe=CMD argument's value must not be empty."
                 fi
         esac
         shift
@@ -1312,7 +1312,7 @@ is_package_available_in_package_manager() {
     esac
 }
 
-# get the version of the give package in the give package manager's repo
+# get the version of the given package in the given package manager's repo
 #
 # examples:
 # get_package_version_by_package_name_in_package_manager apt automake
@@ -2085,7 +2085,7 @@ __install_command_via_run_install_script() {
 	        fetch "$(github_user_content_base_url)/nvm-sh/nvm/master/install.sh" --pipe="$(command -v bash || command -v zsh || echo bash)"
 
 	        export NVM_DIR="${HOME}/.nvm"
-	        . "${HOME}/.nvm/nvm.sh" || true
+	        . "${HOME}/.nvm/nvm.sh"
             ;;
         *)  return 1
     esac
@@ -2444,7 +2444,7 @@ regist_dependency() {
 # {{{ main
 
 main() {
-    set -ex
+    set -e
 
     case $1 in
         -h|--help)
