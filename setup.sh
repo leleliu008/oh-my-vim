@@ -2546,12 +2546,20 @@ EOF
 	shift
     done
 
+    github_base_url() {
+        if [ "$CHINA" = true ] ; then
+            echo 'https://github.com.cnpmjs.org'
+	    else
+            echo 'https://github.com'
+	    fi
+    }
+
     github_user_content_base_url() {
         if [ "$CHINA" = true ] ; then
             echo 'https://raw.githubusercontents.com'
-	else
+	    else
             echo 'https://raw.githubusercontent.com'
-	fi
+	    fi
     }
 
     unset STEP_NUM
@@ -2684,34 +2692,23 @@ EOF
         export GOPROXY='https://goproxy.io'
     fi
 
-    if [ "$CHINA" = true ] ; then
-        #YCM_URL=https://gitee.com/tbang/YouCompleteMe.git
-        YCM_URL='https://gitee.com/YouCompleteMe/YouCompleteMe.git'
-    else
-        YCM_URL='https://github.com/ycm-core/YouCompleteMe.git'
-    fi
-
-    run git clone --recursive "$YCM_URL" "$YCM_INSTALL_DIR"
+    run git clone --recursive "$(github_base_url)/ycm-core/YouCompleteMe.git" "$YCM_INSTALL_DIR"
 
     run cd "$YCM_INSTALL_DIR"
 
+    if [ -d third_party/python-future/docs/notebooks/ ] ; then
+        run rm -rf third_party/python-future/docs/notebooks/
+    fi
+    if [ -d third_party/ycmd/third_party/python-future/docs/notebooks/ ] ; then
+        run rm -rf third_party/ycmd/third_party/python-future/docs/notebooks/
+    fi
+
     if [ "$CHINA" = true ] ; then
-        if [ "$NATIVE_OS_SUBS" = termux ] && [ -f third_party/ycmd/cpp/ycm/CMakeLists.txt ] ; then
-            sed_in_place 's@dl.bintray.com/micbou/libclang@github.com/ycm-core/llvm/releases/download/\${CLANG_VERSION}@g' third_party/ycmd/cpp/ycm/CMakeLists.txt
-            sed_in_place '/SHOW_PROGRESS/c SHOW_PROGRESS' third_party/ycmd/cpp/ycm/CMakeLists.txt
-            sed_in_place 's/CLANG_VERSION 8/CLANG_VERSION 12/' third_party/ycmd/cpp/ycm/CMakeLists.txt
-        fi
-        if [ -d third_party/python-future/docs/notebooks/ ] ; then
-            run rm -rf third_party/python-future/docs/notebooks/
-        fi
-        if [ -d third_party/ycmd/third_party/python-future/docs/notebooks/ ] ; then
-            run rm -rf third_party/ycmd/third_party/python-future/docs/notebooks/
-        fi
         sed_in_place 's/github\.com/github.com.cnpmjs.org/g' $(grep 'github.com' -rl .)
         sed_in_place "s@download.eclipse.org@mirrors.ustc.edu.cn/eclipse@g" ./third_party/ycmd/build.py
     fi
 
-    YCM_INSTALL_ARGS="--clangd-completer --ts-completer --go-completer"
+    YCM_INSTALL_ARGS="--clang-completer --ts-completer --go-completer"
 
     command -v java > /dev/null && {
         YCM_INSTALL_ARGS="$YCM_INSTALL_ARGS --java-completer"
@@ -2739,6 +2736,11 @@ EOF
     fi
 
     sed_in_place "s@/usr/local/bin/python@$PYTHON@g" "$VIMRC"
+
+    [ -e ~/.ycm_extra_conf.py ] || {
+        step "create ~/.ycm_extra_conf.py"
+        cp "$YCM_INSTALL_DIR/third_party/ycmd/.ycm_extra_conf.py" ~/.ycm_extra_conf.py
+    }
 
     echo
     success "All Done. open vim and run :PlugInstall command to install vim plugins!"

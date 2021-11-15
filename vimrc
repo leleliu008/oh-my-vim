@@ -11,7 +11,8 @@ au BufReadPost *.kts setlocal filetype=kotlin
 
 call plug#begin('~/.vim/bundle')
 
-Plug 'git://gitee.com/tbang/YouCompleteMe.git'
+"https://github.com/ycm-core/YouCompleteMe
+Plug 'ycm-core/YouCompleteMe'
 
 "https://github.com/ervandew/supertab
 "Plug 'ervandew/supertab'
