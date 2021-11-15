@@ -1559,7 +1559,6 @@ __pmw_get_available_package_name_by_command_name_emerge() {
     autoheader) echo "automake" ;;
     autopoint)  echo "gettext"  ;;
     pkg-config) echo "pkgconf"  ;;
-        tree)   echo 'app-text/tree' ;;
         *)      echo "$1"
     esac
 }
@@ -1782,6 +1781,8 @@ __pmw_get_available_package_name_by_command_name_apt() {
               echo "python3-docutils" ;;
     sphinx-build)
               echo "python3-sphinx" ;;
+    grpc_cpp_plugin)
+              echo "libgrpc" ;;
     glibtool|libtoolize|glibtoolize)
                 echo "libtool"  ;;
     autoreconf) echo "autoconf" ;;
@@ -2083,8 +2084,11 @@ autoconf  |glibc|linux |x86_64|https://github.com/leleliu008/autoconf-prebuild/r
 autoreconf|glibc|linux |x86_64|https://github.com/leleliu008/autoconf-prebuild/releases/download/2.69/autoconf-2.69-glibc-linux-x86_64.tar.gz
 cmake     |glibc|linux |x86_64|https://github.com/Kitware/CMake/releases/download/v3.20.2/cmake-3.20.2-linux-x86_64.tar.gz
 cmake     |     |darwin|      |https://github.com/Kitware/CMake/releases/download/v3.20.2/cmake-3.20.2-macos-universal.tar.gz
-ninja     |     |linux |      |https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-linux.zip
-ninja     |     |darwin|      |https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-mac.zip
+ninja     |     |linux |x86_64|https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-linux.zip
+ninja     |     |darwin|x86_64|https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-mac.zip
+go        |     |linux |x86_64|https://golang.org/dl/go1.17.2.linux-arm64.tar.gz
+go        |     |darwin|x86_64|https://golang.org/dl/go1.17.2.darwin-amd64.tar.gz
+go        |     |darwin|arm64 |https://golang.org/dl/go1.17.2.darwin-arm64.tar.gz
 EOF
 } | while read LINE
     do
@@ -2507,7 +2511,7 @@ regist_dependency() {
 # {{{ main
 
 main() {
-    set -e
+    set -ex
 
     case $1 in
         -h|--help)
@@ -2565,18 +2569,20 @@ EOF
     unset STEP_NUM
     unset STEP_MESSAGE
 
+    unset NATIVE_OS_KIND
     unset NATIVE_OS_TYPE
     unset NATIVE_OS_NAME
     unset NATIVE_OS_VERS
-    unset NATIVE_OS_SUBS
     unset NATIVE_OS_ARCH
+    unset NATIVE_OS_NCPU
     unset NATIVE_OS_LIBC
+    unset NATIVE_OS_SUBS
 
     unset PREBUILD_BINARY_INSTALL_PREFIX_DIR
     PREBUILD_BINARY_INSTALL_PREFIX_DIR='/opt'
 
     # pip install --user <PKG>
-    export PATH=$HOME/.local/bin:$PATH
+    export PATH="$HOME/.local/bin:$PATH"
 
     if [ -d "$PREBUILD_BINARY_INSTALL_PREFIX_DIR" ] ; then
         for item in $(ls "$PREBUILD_BINARY_INSTALL_PREFIX_DIR")
@@ -2596,20 +2602,26 @@ EOF
         handle_dependency $(__decode_dependency "$dependency") || return 1
     done
 
+    NATIVE_OS_KIND=$(os kind)
     NATIVE_OS_TYPE=$(os type)
     NATIVE_OS_NAME=$(os name)
     NATIVE_OS_VERS=$(os vers)
-    NATIVE_OS_SUBS=$(os subs)
+    NATIVE_OS_NCPU=$(os ncpu)
     NATIVE_OS_ARCH=$(os arch)
     NATIVE_OS_LIBC=$(os libc)
+    NATIVE_OS_SUBS=$(os subs)
 
     step "show current machine os info"
-    echo "NATIVE_OS_TYPE  = $NATIVE_OS_TYPE"
-    echo "NATIVE_OS_NAME  = $NATIVE_OS_NAME"
-    echo "NATIVE_OS_VERS  = $NATIVE_OS_VERS"
-    echo "NATIVE_OS_SUBS  = $NATIVE_OS_SUBS"
-    echo "NATIVE_OS_ARCH  = $NATIVE_OS_ARCH"
-    echo "NATIVE_OS_LIBC  = $NATIVE_OS_LIBC"
+    cat <<EOF
+NATIVE_OS_KIND  = $NATIVE_OS_KIND
+NATIVE_OS_TYPE  = $NATIVE_OS_TYPE
+NATIVE_OS_NAME  = $NATIVE_OS_NAME
+NATIVE_OS_VERS  = $NATIVE_OS_VERS
+NATIVE_OS_ARCH  = $NATIVE_OS_ARCH
+NATIVE_OS_NCPU  = $NATIVE_OS_NCPU
+NATIVE_OS_LIBC  = $NATIVE_OS_LIBC
+NATIVE_OS_SUBS  = $NATIVE_OS_SUBS
+EOF
 
     step "show current machine os effective user info"
     id | tr ' ' '\n' | head -n 2

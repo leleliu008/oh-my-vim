@@ -11,7 +11,6 @@ au BufReadPost *.kts setlocal filetype=kotlin
 
 call plug#begin('~/.vim/bundle')
 
-"https://github.com/ycm-core/YouCompleteMe
 Plug 'ycm-core/YouCompleteMe'
 
 "https://github.com/ervandew/supertab
@@ -19,6 +18,8 @@ Plug 'ycm-core/YouCompleteMe'
 
 "https://github.com/scrooloose/nerdtree
 Plug 'scrooloose/nerdtree'
+
+Plug 'ryanoasis/vim-devicons'
 
 "https://github.com/Xuyuanp/nerdtree-git-plugin
 "Plug 'Xuyuanp/nerdtree-git-plugin'
