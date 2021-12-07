@@ -2511,7 +2511,7 @@ regist_dependency() {
 # {{{ main
 
 main() {
-    set -ex
+    set -e
 
     case $1 in
         -h|--help)
