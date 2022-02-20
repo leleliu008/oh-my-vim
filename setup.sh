@@ -2747,7 +2747,7 @@ EOF
         fetch "$(github_user_content_base_url)/leleliu008/oh-my-vim/master/vimrc" --output-path=$VIMRC
     fi
 
-    sed_in_place "s@/usr/local/bin/python@$PYTHON@g" "$VIMRC"
+    sed_in_place "s|/usr/local/bin/python|$PYTHON|g" "$VIMRC"
 
     [ -e ~/.ycm_extra_conf.py ] || {
         step "create ~/.ycm_extra_conf.py"
