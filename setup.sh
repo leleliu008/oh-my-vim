@@ -654,7 +654,7 @@ get_china_mirror_url() {
                 printf "%s" "$1" | sed 's@githubusercontent.com@githubusercontents.com@'
                 ;;
             *github.com*)
-                printf "%s" "$1" | sed 's@github.com@github.com.cnpm.org@'
+                printf 'https://ghproxy.com/%s\n' "$1"
                 ;;
         esac
     else
