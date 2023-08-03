@@ -2552,7 +2552,7 @@ EOF
 
     github_base_url() {
         if [ "$CHINA" = true ] ; then
-            echo 'https://github.com.cnpmjs.org'
+            echo 'https://ghproxy.com/https://github.com'
 	    else
             echo 'https://github.com'
 	    fi
@@ -2716,7 +2716,7 @@ EOF
     fi
 
     if [ "$CHINA" = true ] ; then
-        sed_in_place 's/github\.com/github.com.cnpmjs.org/g' $(grep 'github.com' -rl .)
+        sed_in_place 's/github\.com/ghproxy.com/github.com/g' $(grep 'github.com' -rl .)
         sed_in_place "s@download.eclipse.org@mirrors.ustc.edu.cn/eclipse@g" ./third_party/ycmd/build.py
     fi
 
