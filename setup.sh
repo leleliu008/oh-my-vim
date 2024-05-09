@@ -123,7 +123,7 @@ ${COLOR_GREEN}$0 --version${COLOR_OFF}
 ${COLOR_GREEN}$0 -V${COLOR_OFF}
     show version of this command.
 
-${COLOR_GREEN}$0 setup${COLOR_OFF}
+${COLOR_GREEN}$0 [--china]${COLOR_OFF}
 	setup vim
 "
         exit
@@ -255,18 +255,18 @@ export GIT_CONFIG_NOSYSTEM=1
 ####################################################################
 
 command -v npm  > /dev/null || {
-	command -v nvm > /dev/null || {
-		#wfetch https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
-		#run bash installer.sh
+    command -v nvm > /dev/null || {
+        #wfetch https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
+        #run bash installer.sh
 
-		wfetch https://get.volta.sh
-		run bash get.volta.sh
-	}
+        wfetch https://get.volta.sh
+        run bash get.volta.sh
+    }
 
-	export VOLTA_HOME="$HOME/.volta"
-	export PATH="$VOLTA_HOME/bin:$PATH"
+    export VOLTA_HOME="$HOME/.volta"
+    export PATH="$VOLTA_HOME/bin:$PATH"
 
-	run volta install node@20.11.0
+    run volta install node@20.11.0
 }
 
 if [ "$CHINA" = 1 ] && [ "$(npm config get registry)" = "https://registry.npmjs.org/" ] ; then
