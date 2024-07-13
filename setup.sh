@@ -210,6 +210,8 @@ EOF
     chmod +x url-transform
 
     export PPKG_URL_TRANSFORM="$PWD/url-transform"
+else
+    unset  PPKG_URL_TRANSFORM
 fi
 
 ####################################################################
@@ -219,7 +221,7 @@ export PPKG_HOME="$PWD/ppkg-home"
 wfetch https://raw.githubusercontent.com/leleliu008/ppkg/master/ppkg
 run chmod a+x ppkg
 
-run ./ppkg env
+run ./ppkg about
 run ./ppkg setup
 run ./ppkg update
 run ./ppkg install python3
@@ -283,32 +285,88 @@ fi
 run install -d ~/.vim/bundle/YouCompleteMe
 run         cd ~/.vim/bundle/YouCompleteMe
 
+####################################################################
+
 GIT_FETCH_URL='https://github.com/ycm-core/YouCompleteMe'
 
 if [ "$CHINA" = 1 ] ; then
     GIT_FETCH_URL="https://mirror.ghproxy.com/$GIT_FETCH_URL"
 fi
 
+####################################################################
+
 run git -c init.defaultBranch=master init
 run git remote add origin "$GIT_FETCH_URL"
 run git -c protocol.version=2 fetch --progress --depth=1 origin HEAD:refs/remotes/origin/master
 run git checkout --progress --force -B master refs/remotes/origin/master
 
-if [ "$CHINA" = 1 ] ; then
-    sed -i 's|github\.com|mirror.ghproxy.com/github.com|g' .gitmodules
+####################################################################
+
+GIT_REPO_ROOT_DIR="$PWD"
+
+GIT_SUBMODULE_HAVE="$(cd "$GIT_REPO_ROOT_DIR" && find . -type f -name '.gitmodules' -print -quit)"
+
+if [ -n "$GIT_SUBMODULE_HAVE" ] ; then
+    if [ -z "$PPKG_URL_TRANSFORM" ] ; then
+        run git submodule update --init --recursive
+    else
+        unset GIT_SUBMODULE_BASEDIR_STACK
+
+        GIT_SUBMODULE_CONFIG_FILE_LIST="$(find "$GIT_REPO_ROOT_DIR" -type f -name '.gitmodules')"
+
+        for f in $GIT_SUBMODULE_CONFIG_FILE_LIST
+        do
+            if [ -z "$GIT_SUBMODULE_BASEDIR_STACK" ] ; then
+                GIT_SUBMODULE_BASEDIR_STACK="${f%/*}"
+            else
+                GIT_SUBMODULE_BASEDIR_STACK="$GIT_SUBMODULE_BASEDIR_STACK;${f%/*}"
+            fi
+        done
+
+        while [ -n "$GIT_SUBMODULE_BASEDIR_STACK" ]
+        do
+            case $GIT_SUBMODULE_BASEDIR_STACK in
+                *\;*) GIT_SUBMODULE_BASEDIR="${GIT_SUBMODULE_BASEDIR_STACK##*;}" ; GIT_SUBMODULE_BASEDIR_STACK="${GIT_SUBMODULE_BASEDIR_STACK%;*}" ;;
+                *)    GIT_SUBMODULE_BASEDIR="${GIT_SUBMODULE_BASEDIR_STACK}"     ; GIT_SUBMODULE_BASEDIR_STACK=
+            esac
+
+            run cd "$GIT_SUBMODULE_BASEDIR"
+
+            GIT_SUBMODULE_NAME_LIST="$(sed -n '/\[submodule ".*"\]/p' .gitmodules | sed 's|\[submodule "\(.*\)"\]|\1|')"
+
+            for GIT_SUBMODULE_NAME in $GIT_SUBMODULE_NAME_LIST
+            do
+                GIT_SUBMODULE_PATH="$(git config --file=.gitmodules --get "submodule.$GIT_SUBMODULE_NAME.path")"
+                GIT_SUBMODULE_URL="$(git config --file=.gitmodules --get "submodule.$GIT_SUBMODULE_NAME.url")"
+                GIT_SUBMODULE_URI="$("$PPKG_URL_TRANSFORM" "$GIT_SUBMODULE_URL")"
+
+                run git submodule set-url "$GIT_SUBMODULE_PATH" "$GIT_SUBMODULE_URI"
+            done
+
+            run git submodule update --init
+
+            GIT_SUBMODULE_PATH_LIST="$(git submodule | sed 's|^ *||' | cut -d ' ' -f2)"
+
+            for GIT_SUBMODULE_PATH in $GIT_SUBMODULE_PATH_LIST
+            do
+                GIT_SUBMODULE_CONFIG_FILE_LIST="$(find "$GIT_SUBMODULE_PATH" -type f -name '.gitmodules')"
+
+                for f in $GIT_SUBMODULE_CONFIG_FILE_LIST
+                do
+                    if [ -z "$GIT_SUBMODULE_BASEDIR_STACK" ] ; then
+                        GIT_SUBMODULE_BASEDIR_STACK="$GIT_SUBMODULE_BASEDIR/${f%/*}"
+                    else
+                        GIT_SUBMODULE_BASEDIR_STACK="$GIT_SUBMODULE_BASEDIR_STACK;$GIT_SUBMODULE_BASEDIR/${f%/*}"
+                    fi
+                done
+            done
+        done
+    fi
 fi
 
-run git submodule update --init
+####################################################################
 
-cd third_party/ycmd
-
-if [ "$CHINA" = 1 ] ; then
-    sed -i 's|github\.com|mirror.ghproxy.com/github.com|g' .gitmodules
-fi
-
-run git submodule update --init
-
-cd -
+run cd ~/.vim/bundle/YouCompleteMe
 
 ####################################################################
 

@@ -51,8 +51,8 @@ Plug 'artur-shaik/vim-javacomplete2'
 "https://github.com/vim-airline/vim-airline
 Plug 'vim-airline/vim-airline'
 
-"https://github.com/iamcco/markdown-preview.vim
-Plug 'iamcco/markdown-preview.vim'
+"https://github.com/iamcco/markdown-preview.nvim
+Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && npx --yes yarn install' }
 
 "https://github.com/vim-ruby/vim-ruby/wiki/VimRubySupport
 Plug 'vim-ruby/vim-ruby'
@@ -76,7 +76,6 @@ Plug 'majutsushi/tagbar'
 call plug#end()
 
 let g:mkdp_path_to_chrome = "open -a Google\\ Chrome"
-let g:mkdp_browserfunc = 'MKDP_browserfunc_default'
 let g:mkdp_auto_start = 1
 let g:mkdp_auto_open = 1
 let g:mkdp_auto_close = 1
